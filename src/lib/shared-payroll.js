@@ -17,5 +17,5 @@ export function useSharedPayroll(client,user,attendance,payslips,setAttendance,s
  refresh();const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);return()=>{disposed=true;clearInterval(timer);window.removeEventListener('focus',refresh);if(stores.current?.a===a)stores.current=null}
  },[client,user?.id])
  useEffect(()=>{if(!ready||!stores.current)return;const {a,p}=stores.current;a.edit(attendance);p.edit(payslips);let active=true;setSaving(true);Promise.all([a.flush(),p.flush()]).catch(error=>{if(active)setError('Chưa lưu lên dữ liệu dùng chung: '+error.message)}).finally(()=>{if(active)setSaving(false)});return()=>{active=false}},[attendance,payslips,ready])
- return {ready,saving,importLocal:async(a,p)=>{if(!ready||!stores.current)throw Error('Hãy đăng nhập và chờ tải dữ liệu dùng chung.');const rows=await stores.current.a.importMissing(a),slips=await stores.current.p.importMissing(p);setAttendance(rows);setPayslips(slips)}}
+ return {ready,saving,importLocal:async(a,p)=>{if(!ready||!stores.current)throw Error('Hãy chờ tải dữ liệu dùng chung.');const rows=await stores.current.a.importMissing(a),slips=await stores.current.p.importMissing(p);setAttendance(rows);setPayslips(slips)}}
 }
