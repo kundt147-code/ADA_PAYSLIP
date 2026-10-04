@@ -425,7 +425,7 @@ export async function buildPayslipZip(payslips,employees,attendance){
  const zip=new JSZip(),folders=new Map(),usedFolders=new Set()
  for(const p of payslips){
   const e=employees.find(e=>e.id===p.employeeId);if(!e)continue
-  const period=safeFile(p.displayPeriod||p.period||'KY'), branch=safeFile(e.branch||'Chưa có chi nhánh')
+  const period=safeFile(p.displayPeriod||p.period||'KY'), branch=safeFile(String(e.branch||'').trim()||'Chưa có chi nhánh')
   const root='PAYSLIP_'+branch+'_'+period+'/'
   const types=[...new Set(p.types||[])]
   let parent=root
@@ -435,7 +435,8 @@ export async function buildPayslipZip(payslips,employees,attendance){
    parent=folders.get(key)
   }
   for(const type of types){
-   const name='PAYSLIP_'+safeFile(e.name)+'_'+safeFile(e.position)+'_'+branch+'_'+typeCode[type]+'_'+period+'.xlsx'
+   const role=({teacher:'GV',teacherBH:'GV',office:'VP',officeBH:'VP'})[type]
+   const name=['PAYSLIP',safeFile(e.name),role,String(e.branch||'').trim()?safeFile(e.branch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
    let path=parent+name,i=2;while(zip.file(path))path=parent+name.replace(/\.xlsx$/,'_'+i+++'.xlsx')
    zip.file(path,await payslipBuffer(p,e,attendance,type))
   }
@@ -455,3 +456,4 @@ export function makePayslip(employee, period, attendance, sourceRows = null) {
   if (n(employee.salary?.insuranceBase) > 0) { if (hasTeacher) types.push('teacherBH'); if (hasOffice) types.push('officeBH') }
   return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types, createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class||0,assist:employee.salary?.teacher?.assist||0,tutoring:employee.salary?.teacher?.tutoring||0,assistTutoring:employee.salary?.teacher?.assistTutoring||0,full:employee.salary?.office?.full||0,part:employee.salary?.office?.part||0},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
 }
+
