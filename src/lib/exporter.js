@@ -289,6 +289,9 @@ function formulaCellResult(ws, address, stack = new Set()) {
   })
   f = f.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)')
   f = f.replace(/\b([A-Z]{1,3}\d+)\b/g, (_, addr) => String(refValue(addr)))
+  // Reduce innermost MIN/MAX calls before evaluating the arithmetic expression.
+  const numericExpression=expression=>{if(!/^[\d\s.+*/()%\-]+$/.test(expression))throw new Error('Unsupported numeric expression');const value=Function(`"use strict"; return (${expression})`)();if(!Number.isFinite(value))throw new Error('Invalid numeric result');return value}
+  for(let i=0;i<32&&/\b(?:MIN|MAX)\(/i.test(f);i++){const previous=f;f=f.replace(/\b(MIN|MAX)\(([^()]*)\)/gi,(_,name,args)=>String((name.toUpperCase()==='MIN'?Math.min:Math.max)(...args.split(',').map(numericExpression))));if(previous===f)break}
   try {
     if (!/^[\d\s.+*/()%\-]+$/.test(f)) throw new Error('Unsupported formula: '+f)
     const result = Function(`"use strict"; return (${f})`)()
@@ -371,7 +374,7 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
     if (type === 'office' || type === 'officeBH') {
       const vp=wb.getWorksheet(type==='office'?'VP':'VP_BH'); if(!vp) continue
       setCommonPeriod(vp,{title:'A6',month:'B7',year:'E7'},'PHIẾU THANH TOÁN TIỀN LƯƠNG_')
-      setValue(vp,'E10',employee.name); setValue(vp,'E11',employee.position||''); setValue(vp,'E17',payslip.overrides?.bank??employee.bank??''); setValue(vp,'E18',payslip.overrides?.account??employee.account??''); setValue(vp,'E13',model.officeHours||0); setMoney(vp,'E20',model.officeFull); setMoney(vp,'E21',model.officePart); setMoney(vp,'E22',support); const ins=money(insuranceBase*0.105); setMoney(vp,'E25',ins)
+      setValue(vp,'E10',employee.name); setValue(vp,'E11','VP'); setValue(vp,'E17',payslip.overrides?.bank??employee.bank??''); setValue(vp,'E18',payslip.overrides?.account??employee.account??''); setValue(vp,'E13',model.officeHours||0); setMoney(vp,'E20',model.officeFull); setMoney(vp,'E21',model.officePart); setMoney(vp,'E22',support); const ins=money(insuranceBase*0.105); setMoney(vp,'E25',ins)
     }
     if (type === 'transfer') {
       const ck=wb.getWorksheet('CK'); if(!ck) continue
@@ -395,26 +398,21 @@ function sheetTypeFor(name){return ({GV:'teacher',VP:'office',CK:'transfer',GV_B
 
 function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
   if(!ws)return
-  const transfer=n(employee.salary?.transfer), base=n(employee.salary?.insuranceBase)
-  const meal=n(employee.salary?.mealAllowance), support=n(employee.salary?.support)
+  const transfer=n(employee.salary?.transfer),meal=n(employee.salary?.mealAllowance),support=n(employee.salary?.support)
   const account=payslip.overrides?.account??employee.account??''
+  const days=display.year&&display.month?new Date(Number(display.year),Number(display.month),0).getDate():30
   if(teacher){
-    ws.getCell('Q7').value={formula:'AJ5'}
-    // MS4's summary is blank in the supplied workbook. Complete the corresponding
-    // MS5 formulas at the MS4 columns, without duplicating computed values in JS.
-    const input={L5:Number(display.month),M5:employee.name,N5:account,O5:new Date(Number(display.year),Number(display.month),0).getDate(),P5:transfer,Q5:meal,T5:support,U5:base,AI5:0,AH5:0}
-    Object.entries(input).forEach(([c,v])=>setValue(ws,c,v))
-    const formulas={R5:'P5+Q5',S5:'P5',V5:'U5*V3',W5:'U5*W3',X5:'U5*X3',Z5:'SUM(V5:X5)',AC5:'U5*AC3',AD5:'U5*AD3',AE5:'U5*AE3',AF5:'SUM(AC5:AE5)',AJ5:'R5+T5-AF5-AH5-AI5'}
-    Object.entries(formulas).forEach(([c,f])=>{ws.getCell(c).value={formula:f};ws.getCell(c).numFmt=MONEY_FMT})
-    const totalRow=ws.findRow(ws.rowCount)
-    // Locate the actual take-home row after detail row resizing.
+    const inputs={L5:Number(display.month)||0,M5:employee.name,N5:account,O5:days,P5:transfer,Q5:meal,R5:0,U5:support,V5:n(employee.salary?.insuranceBase),AJ5:0}
+    Object.entries(inputs).forEach(([cell,value])=>setValue(ws,cell,value))
+    // Use the employee insurance base with the revised gross and progressive-tax formulas.
+    ws.getCell('Q7').value={formula:'AK5'}
     let takeAddress='H61';ws.eachRow(row=>{if(String(row.getCell(2).value||'').includes('CÒN LẠI THỰC NHẬN'))takeAddress='H'+row.number})
     ws.getCell('Q8').value={formula:takeAddress+'-Q7'}
   }else{
-    setValue(ws,'M5',transfer);ws.getCell('N7').value={formula:'AG5'};setValue(ws,'I5',Number(display.month));setValue(ws,'J5',employee.name);setValue(ws,'K5',account)
-    setMoney(ws,'N5',meal);setMoney(ws,'Q5',support)
-    // R5 is the insurance-base input; preserve the remaining native MS5 formulas.
-    setMoney(ws,'R5',base)
+    const inputs={I5:Number(display.month)||0,J5:employee.name,K5:account,L5:days,M5:transfer,N5:meal,O5:0,R5:support,S5:n(employee.salary?.insuranceBase),AG5:0}
+    Object.entries(inputs).forEach(([cell,value])=>setValue(ws,cell,value))
+    ws.getCell('N7').value={formula:'AH5'}
+    ws.getCell('N8').value={formula:'E26-N7'}
   }
 }
 
@@ -449,7 +447,7 @@ export async function exportMany(payslips,employees,attendance,folderName){await
 
 export function makePayslip(employee, period, attendance, sourceRows = null) {
   const lineEdits = sourceRows ? structuredClone(sourceRows) : attendance.filter(x => x.period === period && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name) || samePerson(x.employee, employee.name)))
-  const hasTeacher = lineEdits.some(x => x.category !== 'Văn phòng') || !!(employee.salary?.teacher?.class || employee.salary?.teacher?.assist || employee.salary?.teacher?.tutoring || employee.salary?.teacher?.assistTutoring)
+  const hasTeacher = lineEdits.some(x => ['Lớp chung','Phụ đạo','Lớp kèm','Phụ đạo kèm'].includes(x.category))
   const hasOffice = lineEdits.some(x => x.category === 'Văn phòng') || !!(employee.salary?.office?.full || employee.salary?.office?.part)
   const types = [...(hasTeacher ? ['teacher'] : []), ...(hasOffice ? ['office'] : [])]
   if (n(employee.salary?.transfer) > 0) types.push('transfer')
