@@ -447,7 +447,7 @@ export async function exportMany(payslips,employees,attendance,folderName){await
 
 export function makePayslip(employee, period, attendance, sourceRows = null) {
   const lineEdits = sourceRows ? structuredClone(sourceRows) : attendance.filter(x => x.period === period && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name) || samePerson(x.employee, employee.name)))
-  const hasTeacher = lineEdits.some(x => ['Lớp chung','Phụ đạo','Lớp kèm','Phụ đạo kèm'].includes(x.category))
+  const hasTeacher = lineEdits.some(x => ['Lớp chung','Phụ đạo','Lớp kèm','Phụ đạo kèm'].includes(x.category) && validTeacherRow(x))
   const hasOffice = lineEdits.some(x => x.category === 'Văn phòng') || !!(employee.salary?.office?.full || employee.salary?.office?.part)
   const types = [...(hasTeacher ? ['teacher'] : []), ...(hasOffice ? ['office'] : [])]
   if (n(employee.salary?.transfer) > 0) types.push('transfer')

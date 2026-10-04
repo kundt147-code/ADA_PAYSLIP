@@ -67,3 +67,5 @@ test('GV and GV_BH require teaching attendance in the selected period, including
   }
  }
 });
+
+test('empty or invalid teaching rows do not generate GV templates',()=>{for(const extra of [{hours:0},{date:''},{className:''}]){const p=makePayslip(employee,'2026-10',[line('Lớp chung','A',extra)]);assert(!p.types.includes('teacher'));assert(!p.types.includes('teacherBH'))}});

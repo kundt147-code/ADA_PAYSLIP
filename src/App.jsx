@@ -171,11 +171,24 @@ function PayslipPreview({payslip,employee,attendance,close,edit,exportOne}){
   const cached=cache.current.get(sheet)
   if(cached){setGrid(cached);setBusy(false);setPreviewError('');return}
   setBusy(true);setPreviewError('');setGrid(null)
-  const worker=new Worker(new URL('./lib/preview.worker.js',import.meta.url),{type:'module'})
-  worker.onmessage=({data})=>{if(data.error)setPreviewError(data.error);else{cache.current.set(sheet,data.grid);setGrid(data.grid)}setBusy(false);worker.terminate()}
-  worker.onerror=event=>{setPreviewError(event.message||'Không thể dựng bản xem trước.');setBusy(false);worker.terminate()}
-  worker.postMessage({payslip,employee,attendance,type:types.find(t=>labelMap[t]===sheet),sheet})
-  return()=>worker.terminate()
+  let worker,disposed=false,recovering=false
+  const controller=new AbortController()
+  const type=types.find(t=>labelMap[t]===sheet)
+  const complete=data=>{if(disposed)return;if(data.error)setPreviewError(data.error);else{cache.current.set(sheet,data.grid);setGrid(data.grid)}setBusy(false);worker?.terminate()}
+  const recover=async()=>{
+   if(disposed||recovering)return;recovering=true;worker?.terminate()
+   try{const buffer=await payslipBuffer(payslip,employee,attendance,type,{signal:controller.signal});const {previewGrid}=await import('./lib/preview.js');complete({grid:await previewGrid(buffer,sheet)})}
+   catch(error){if(!disposed)complete({error:error.message||'Không thể dựng bản xem trước.'})}
+  }
+  try{
+   worker=new Worker(new URL('./lib/preview.worker.js',import.meta.url),{type:'module'})
+   worker.onmessage=({data})=>data.error?recover():complete(data)
+   worker.onerror=event=>{event.preventDefault();recover()}
+   worker.onmessageerror=recover
+   worker.postMessage({payslip,employee,attendance,type,sheet})
+  }catch{recover()}
+  return()=>{disposed=true;controller.abort();worker?.terminate()}
+
  },[payslip,employee,attendance,sheet])
 
  return <div className="modal-backdrop"><div className="modal payslip-preview-modal"><div className="modal-head"><div><h3>{employee.name}{payslip.displayPeriod?` — ${periodLabel(payslip.displayPeriod)}`:''}</h3><span className="muted">{payslip.displayPeriod?periodLabel(payslip.displayPeriod):'Chưa chọn thời gian hiển thị'}</span></div><button className="modal-close" onClick={close} aria-label="Đóng">×</button></div><div className="preview-tabs">{types.map(t=>{const s=labelMap[t];return <button key={s} className={sheet===s?'active':''} onClick={()=>setSheet(s)}>{s}</button>})}</div>{busy?<div className="preview-loading">Đang dựng bản xem trước...</div>:previewError?<div className="preview-loading"><b>Không thể xem trước.</b><span>{previewError}</span></div>:<SheetPreview grid={grid?.[sheet]}/>}<div className="modal-foot"><button className="secondary" onClick={close}>Đóng</button><button className="secondary" onClick={edit}>Chỉnh sửa</button><button className="primary" onClick={exportOne}>Export</button></div></div></div>
