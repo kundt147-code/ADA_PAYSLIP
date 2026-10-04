@@ -8,9 +8,9 @@ export const supabase = url && key ? createClient(url,key) : null
 
 export async function listEmployees() {
   if (!supabase) return readEmployeesLocal().map(decodeEmployee)
-  const { data, error } = await supabase.from('employees').select('*').order('name')
-  if (error) throw error
-  return (data || []).map(decodeEmployee)
+  const rows=[]
+  for(let from=0;;from+=500){const {data,error}=await supabase.from('employees').select('*').order('name').order('id').range(from,from+499);if(error)throw error;rows.push(...(data||[]));if((data||[]).length<500)break}
+  return rows.map(decodeEmployee)
 }
 export async function upsertEmployee(emp) {
   if (!supabase) {
