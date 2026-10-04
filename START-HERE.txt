@@ -1,0 +1,19 @@
+PAYSLIP WEB - BẢN MVP HOÀN CHỈNH
+
+1. Giải nén thư mục.
+2. Mở Terminal tại thư mục.
+3. Chạy: npm install
+4. Chạy: npm run dev
+5. Mở địa chỉ Vite hiển thị.
+
+Dữ liệu chấm công + phiếu lương: sessionStorage (refresh giữ, đóng tab sẽ kết thúc session theo cơ chế trình duyệt).
+Thông tin nhân viên: localStorage khi chưa cấu hình Supabase; cấu hình Supabase để dùng chung trên web.
+
+Để dùng chung:
+- Tạo Supabase project.
+- Chạy supabase.sql.
+- Tạo file .env từ .env.example và điền URL + anon key.
+- npm run build rồi deploy thư mục dist lên hosting.
+
+Template phiếu lương: public/payslip-template.xlsx
+File mẫu import: public/MAU_IMPORT_CHAM_CONG.xlsx

@@ -1,0 +1,25 @@
+import {decodeEmployee,encodeEmployee} from './employee-profile.js'
+import { createClient } from '@supabase/supabase-js'
+import { readEmployeesLocal, writeEmployeesLocal } from './storage'
+
+const url = import.meta.env.VITE_SUPABASE_URL
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const supabase = url && key ? createClient(url,key) : null
+
+export async function listEmployees() {
+  if (!supabase) return readEmployeesLocal().map(decodeEmployee)
+  const { data, error } = await supabase.from('employees').select('*').order('name')
+  if (error) throw error
+  return (data || []).map(decodeEmployee)
+}
+export async function upsertEmployee(emp) {
+  if (!supabase) {
+    const all = readEmployeesLocal(); const i=all.findIndex(x=>x.id===emp.id); if(i>=0) all[i]=encodeEmployee(emp); else all.push(encodeEmployee(emp)); writeEmployeesLocal(all); return decodeEmployee(encodeEmployee(emp))
+  }
+  const { data, error } = await supabase.from('employees').upsert(encodeEmployee(emp)).select().single(); if(error) throw error; return decodeEmployee(data)
+}
+export async function deleteEmployee(id) {
+  if (!supabase) { writeEmployeesLocal(readEmployeesLocal().filter(x=>x.id!==id)); return }
+  const { error } = await supabase.from('employees').delete().eq('id',id); if(error) throw error
+}
+
