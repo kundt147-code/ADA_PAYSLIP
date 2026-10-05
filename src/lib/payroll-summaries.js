@@ -1,0 +1,32 @@
+import ExcelJS from 'exceljs'
+import {writeExcelBuffer} from './xlsx-output.js'
+const number=v=>Number.isFinite(Number(v))?Number(v):0
+const safe=v=>String(v||'').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').trim().replace(/[. ]+$/g,'')||'CHƯA CÓ CHI NHÁNH'
+const branchName=v=>({TP:'TÂN PHÚ',PN:'PHÚ NHUẬN'})[String(v||'').trim().toUpperCase()]||String(v||'CHƯA CÓ CHI NHÁNH').trim().toLocaleUpperCase('vi-VN')
+async function template(name){const response=await fetch('/summary-'+name+'.xlsx');if(!response.ok)throw Error('Không tải được mẫu tổng hợp '+name);const w=new ExcelJS.Workbook();await w.xlsx.load(await response.arrayBuffer());return w}
+function sheet(w,base,name){let clean=String(name).replace(/[\[\]:*?/\\]/g,'_').slice(0,31)||'Tổng hợp',i=2;while(w.getWorksheet(clean))clean=String(name).slice(0,27)+'_'+i++;const s=w.addWorksheet(clean);base.columns.forEach((c,i)=>{s.getColumn(i+1).width=c.width});s.pageSetup={...base.pageSetup};s.views=base.views;return s}
+function row(s,base,r,values,sourceRow=r){s.getRow(r).height=base.getRow(sourceRow).height;values.forEach((v,i)=>{const c=s.getCell(r,i+1);c.style=structuredClone(base.getCell(sourceRow,i+1).style);c.value=v})}
+function table(s,base,title,entries,cash=false){row(s,base,1,[title]);s.mergeCells('A1:C1');row(s,base,2,['No.','TEACHER',cash?'LƯƠNG TIỀN MẶT':'CHUYỂN KHOẢN']);entries.forEach((e,i)=>row(s,base,i+3,[i+1,e.name,e.amount],3));const end=entries.length+3;row(s,base,end,['TỔNG','',entries.reduce((n,e)=>n+e.amount,0)],cash?24:12);s.mergeCells(`A${end}:B${end}`);return entries.reduce((n,e)=>n+e.amount,0)}
+function teacherTotal(s){let out=0;s.eachRow(r=>{if(String(r.getCell(2).value||'').includes('CÒN LẠI THỰC NHẬN'))out=number(r.getCell(8).value)});return out}
+export async function addPayrollSummaries(zip,payslips,employees,attendance,getBuffer){
+ const [ckTemplate,cashTemplate,tutorTemplate]=await Promise.all([template('transfer'),template('cash'),template('tutoring')]);const periods=new Map(),seen=new Set()
+ for(const p of payslips){const e=employees.find(e=>e.id===p.employeeId);if(!e)continue;const period=p.displayPeriod||p.period||'KY',key=e.id+'|'+period;if(seen.has(key))continue;seen.add(key);if(!periods.has(period))periods.set(period,[]);const sheets=new Map();for(const type of new Set(p.types||[])){const w=new ExcelJS.Workbook();await w.xlsx.load(await getBuffer(p,e,type));sheets.set(type,w.worksheets[0])}
+ const t=sheets.get('teacherBH'),o=sheets.get('officeBH'),ck=sheets.get('transfer');const transfer=t?number(t.getCell('Q7').value):o?number(o.getCell('N7').value):ck?number(ck.getCell('E23').value):0
+ let cash=0;if(t)cash+=number(t.getCell('Q8').value);else if(sheets.has('teacher'))cash+=teacherTotal(sheets.get('teacher'))
+ if(o)cash+=number(o.getCell('N8').value);else if(sheets.has('office'))cash+=number(sheets.get('office').getCell('E26').value)
+ if(!t&&!o&&ck&&(sheets.has('teacher')||sheets.has('office')))cash-=transfer
+ periods.get(period).push({p,e,transfer,cash,hasTransfer:!!(t||o||ck)})
+ }
+ for(const [period,records] of periods){const stamp=/^\d{4}-\d{2}$/.test(period)?period.slice(5)+'.'+period.slice(0,4):safe(period),groups=new Map();for(const x of records){const b=branchName(x.e.branch);if(!groups.has(b))groups.set(b,[]);groups.get(b).push(x)}
+ const ck=new ExcelJS.Workbook(),cash=new ExcelJS.Workbook(),totals=[],tutor=new ExcelJS.Workbook(),list=sheet(tutor,tutorTemplate.worksheets[0],'DANH SÁCH HỌC SINH TUTOR');row(list,tutorTemplate.worksheets[0],2,['DANH SÁCH HỌC VIÊN KÈM']);list.mergeCells('A2:C2');row(list,tutorTemplate.worksheets[0],3,['STT','TÊN HỌC VIÊN','NOTE']);let index=0
+ for(const [branch,items] of groups){const cs=sheet(ck,ckTemplate.worksheets[0],branch),ms=sheet(cash,cashTemplate.worksheets[branch==='TÂN PHÚ'?1:0]||cashTemplate.worksheets[0],branch);table(cs,ckTemplate.worksheets[0],`TỔNG HỢP LƯƠNG THÁNG ${stamp} ${branch}`,items.filter(x=>x.hasTransfer).map(x=>({name:x.e.name,amount:x.transfer})));const total=table(ms,cashTemplate.worksheets[0],`TỔNG HỢP LƯƠNG THÁNG ${stamp} ${branch}`,items.filter(x=>(x.p.types||[]).some(t=>t!=='transfer')).map(x=>({name:x.e.name,amount:x.cash})),true);totals.push({branch,total})
+ const sessions=new Map();for(const item of items){for(const a of item.p.lineEdits||[]){if(!['Lớp kèm','Phụ đạo kèm'].includes(a.category))continue;const id=a.id||JSON.stringify(a);if(!sessions.has(id))sessions.set(id,a)}}
+ const students=new Map();for(const a of sessions.values()){for(const name of [...new Set(String(a.className||a.student||'Chưa có tên học viên').split(/\s+[-–]\s+/).map(x=>x.trim()).filter(Boolean))]){if(!students.has(name))students.set(name,[]);students.get(name).push(a)}}
+ for(const [name,entries] of students){row(list,tutorTemplate.worksheets[0],index+6,[++index,name,branch],6);const base=tutorTemplate.worksheets[1],s=sheet(tutor,base,index+'. '+(groups.size>1?branch+' ':'')+name);row(s,base,1,['',`${name} - THÁNG ${stamp}`]);s.mergeCells('B1:G1');let r=3;for(const category of ['Lớp kèm','Phụ đạo kèm']){row(s,base,r++,['NGÀY','BUỔI','LỚP','GIỜ BẮT ĐẦU','GIỜ KẾT THÚC','SỐ GIỜ','GIÁO VIÊN',category==='Lớp kèm'?'KÈM':'PHỤ ĐẠO KÈM'],3);const selected=entries.filter(x=>x.category===category).sort((a,b)=>String(a.date).localeCompare(String(b.date)));for(const a of selected)row(s,base,r++,[/^\d{4}-\d{2}-\d{2}$/.test(a.date||'')?new Date(a.date+'T00:00:00Z'):a.date,a.day,a.className,a.start,a.end,number(a.hours),a.teacher,category==='Lớp kèm'?'KÈM':'PHỤ ĐẠO KÈM'],category==='Lớp kèm'?4:12);row(s,base,r,['','',category==='Lớp kèm'?'TỔNG GIỜ DẠY KÈM':'TỔNG GIỜ DẠY PHỤ ĐẠO KÈM','','',Math.round(selected.reduce((v,a)=>v+number(a.hours),0)*100)/100],10);s.mergeCells(`C${r}:E${r}`);r++}}
+ }
+ zip.file(`GIỜ DẠY KÈM T${stamp}${groups.size===1?' - '+safe([...groups.keys()][0]):''}.xlsx`,await writeExcelBuffer(tutor))
+ const first=cash.worksheets[0],base=cashTemplate.worksheets[0];totals.forEach((t,i)=>{row(first,base,i+3,[first.getCell(i+3,1).value,first.getCell(i+3,2).value,first.getCell(i+3,3).value,'',`LƯƠNG TIỀN MẶT ${t.branch}`,t.total],3)});row(first,base,totals.length+3,[first.getCell(totals.length+3,1).value,first.getCell(totals.length+3,2).value,first.getCell(totals.length+3,3).value,'','TỔNG CỘNG LƯƠNG TIỀN MẶT',totals.reduce((v,t)=>v+t.total,0)],5)
+ zip.file(`TỔNG LƯƠNG CHUYỂN KHOẢN T${stamp}.xlsx`,await writeExcelBuffer(ck));zip.file(`TỔNG LƯƠNG TIỀN MẶT T${stamp}.xlsx`,await writeExcelBuffer(cash))
+ }
+}
+

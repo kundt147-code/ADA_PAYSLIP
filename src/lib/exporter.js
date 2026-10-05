@@ -1,3 +1,4 @@
+import {addPayrollSummaries} from './payroll-summaries.js'
 import { writeExcelBuffer } from './xlsx-output.js'
 import ExcelJS from 'exceljs'
 import JSZip from 'jszip'
@@ -427,31 +428,35 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
 export async function payslipBuffer(payslip, employee, attendance, type=null, {signal}={}) { signal?.throwIfAborted(); const wb=await workbookFor(payslip,employee,attendance,type,signal); signal?.throwIfAborted(); const out=await writeExcelBuffer(wb); signal?.throwIfAborted(); return out }
 function safeFile(s){return String(s||'').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').trim().replace(/[. ]+$/g,'')||'UNKNOWN'}
 const typeCode={teacher:'MS1',office:'MS2',transfer:'MS3',teacherBH:'MS4',officeBH:'MS5'}
-export async function buildPayslipZip(payslips,employees,attendance){
- const zip=new JSZip(),folders=new Map(),usedFolders=new Set()
+export async function buildPayslipZip(payslips,employees,attendance,{summaries=false}={}){
+ const zip=new JSZip(),folders=new Map(),usedFolders=new Set(),bufferCache=new Map();const getBuffer=async(p,e,type)=>{if(!bufferCache.has(p))bufferCache.set(p,new Map());const cached=bufferCache.get(p);if(!cached.has(type))cached.set(type,await payslipBuffer(p,e,attendance,type));return cached.get(type)}
  for(const p of payslips){
   const e=employees.find(e=>e.id===p.employeeId);if(!e)continue
-  const period=safeFile(p.displayPeriod||p.period||'KY'), branch=safeFile(String(e.branch||'').trim()||'Chưa có chi nhánh')
-  const root='PAYSLIP_'+branch+'_'+period+'/'
-  const types=[...new Set(p.types||[])]
-  let parent=root
-  if(types.length>1){
-   const key=root+'|'+e.id
-   if(!folders.has(key)){let name=safeFile(e.name),i=2;while(usedFolders.has(root+name))name=safeFile(e.name)+'_'+i++;usedFolders.add(root+name);folders.set(key,root+name+'/')}
-   parent=folders.get(key)
-  }
-  for(const type of types){
-   const role=({teacher:'GV',teacherBH:'GV',office:'VP',officeBH:'VP'})[type]
-   const name=['PAYSLIP',safeFile(e.name),role,String(e.branch||'').trim()?safeFile(e.branch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
-   let path=parent+name,i=2;while(zip.file(path))path=parent+name.replace(/\.xlsx$/,'_'+i+++'.xlsx')
-   zip.file(path,await payslipBuffer(p,e,attendance,type))
+  const period=safeFile(p.displayPeriod||p.period||'KY'),rawBranch=String(e.branch||'').trim(),branch=safeFile(({TP:'TÂN PHÚ',PN:'PHÚ NHUẬN'})[rawBranch.toUpperCase()]||rawBranch.toLocaleUpperCase('vi-VN')||'CHƯA CÓ CHI NHÁNH')
+  const types=[...new Set(p.types||[])],groups=[]
+  if(types.some(t=>t==='teacher'||t==='teacherBH'))groups.push(['GIÁO VIÊN',types.filter(t=>['teacher','teacherBH','transfer'].includes(t))])
+  if(types.some(t=>t==='office'||t==='officeBH'))groups.push(['VĂN PHÒNG',types.filter(t=>['office','officeBH','transfer'].includes(t))])
+  if(!groups.length&&types.includes('transfer'))groups.push([/(?:^|;)\s*(GV|TG)\s*(?:;|$)/i.test(e.position||'')?'GIÁO VIÊN':'VĂN PHÒNG',['transfer']])
+  const buffers=new Map()
+  for(const [group,groupTypes] of groups){
+   const root='PAYSLIP_'+branch+'_'+group+'/'
+   let parent=root
+   if(groupTypes.length>1){const key=root+'|'+e.id;if(!folders.has(key)){let name=safeFile(e.name),i=2;while(usedFolders.has(root+name))name=safeFile(e.name)+'_'+i++;usedFolders.add(root+name);folders.set(key,root+name+'/')}parent=folders.get(key)}
+   for(const type of groupTypes){
+    const role=({teacher:'GV',teacherBH:'GV',office:'VP',officeBH:'VP'})[type]
+    const name=['PAYSLIP',safeFile(e.name),role,rawBranch?safeFile(e.branch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
+    let path=parent+name,i=2;while(zip.file(path))path=parent+name.replace(/\.xlsx$/,'_'+i+++'.xlsx')
+    if(!buffers.has(type))buffers.set(type,await getBuffer(p,e,type))
+    zip.file(path,buffers.get(type))
+   }
   }
  }
+ if(summaries&&payslips.length)await addPayrollSummaries(zip,payslips,employees,attendance,getBuffer)
  return zip
 }
 async function downloadPayslipZip(zip,name){const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-export async function exportPayslip(payslip,employee,attendance){const zip=await buildPayslipZip([payslip],[employee],attendance);await downloadPayslipZip(zip,'PAYSLIP_'+safeFile(employee.branch||'Chưa có chi nhánh')+'_'+safeFile(payslip.displayPeriod||payslip.period||'KY'))}
-export async function exportMany(payslips,employees,attendance,folderName){await downloadPayslipZip(await buildPayslipZip(payslips,employees,attendance),safeFile(folderName||'PAYSLIP'))}
+export async function exportPayslip(payslip,employee,attendance){const zip=await buildPayslipZip([payslip],[employee],attendance,{summaries:true});await downloadPayslipZip(zip,'PAYSLIP_'+safeFile(employee.branch||'Chưa có chi nhánh')+'_'+safeFile(payslip.displayPeriod||payslip.period||'KY'))}
+export async function exportMany(payslips,employees,attendance,folderName){await downloadPayslipZip(await buildPayslipZip(payslips,employees,attendance,{summaries:true}),safeFile(folderName||'PAYSLIP'))}
 
 export function makePayslip(employee, period, attendance, sourceRows = null) {
   const lineEdits = sourceRows ? structuredClone(sourceRows) : attendance.filter(x => x.period === period && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name) || samePerson(x.employee, employee.name)))
