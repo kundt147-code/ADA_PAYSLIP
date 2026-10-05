@@ -1,0 +1,1 @@
+Cập nhật vòng 24: chú thích cột S (Cơ chế lương đặc biệt), ô S1/S2/S3 có đầy đủ cơ chế 1–4, đơn giá cơ chế 4 = 170.000đ/giờ, ưu tiên 4/3 → 2/1, cơ chế 3 và 4 loại trừ nhau. Giữ nguyên các phần XML khác, format, font Times New Roman và thứ tự cột. Đổi phiên bản URL mẫu để tránh dùng file cache cũ. 5 kiểm tra import/mapping vòng 21 đạt. Chưa triển khai lên Vercel.

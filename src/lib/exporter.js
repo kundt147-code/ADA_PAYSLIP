@@ -290,7 +290,7 @@ function formulaCellResult(ws, address, stack = new Set()) {
     return String(new Date(Number(y), Number(m), 0).getDate())
   })
   f = f.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)')
-  f = f.replace(/\b([A-Z]{1,3}\d+)\b/g, (_, addr) => String(refValue(addr)))
+  f = f.replace(/\b([A-Z]{1,3}\d+)\b/g, (_, addr) => ' '+String(refValue(addr))+' ')
   // Reduce innermost MIN/MAX calls before evaluating the arithmetic expression.
   const numericExpression=expression=>{if(!/^[\d\s.+*/()%\-]+$/.test(expression))throw new Error('Unsupported numeric expression');const value=Function(`"use strict"; return (${expression})`)();if(!Number.isFinite(value))throw new Error('Invalid numeric result');return value}
   for(let i=0;i<32&&/\b(?:MIN|MAX)\(/i.test(f);i++){const previous=f;f=f.replace(/\b(MIN|MAX)\(([^()]*)\)/gi,(_,name,args)=>String((name.toUpperCase()==='MIN'?Math.min:Math.max)(...args.split(',').map(numericExpression))));if(previous===f)break}
@@ -382,7 +382,7 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
     if (type === 'office' || type === 'officeBH') {
       const vp=wb.getWorksheet(type==='office'?'VP':'VP_BH'); if(!vp) continue
       setCommonPeriod(vp,{title:'A6',month:'B7',year:'E7'},'PHIẾU THANH TOÁN TIỀN LƯƠNG_')
-      setValue(vp,'E10',employee.name); setValue(vp,'E11','VP'); setValue(vp,'E17',payslip.overrides?.bank??employee.bank??''); setValue(vp,'E18',payslip.overrides?.account??employee.account??''); setValue(vp,'E13',model.officeHours||0); setMoney(vp,'E20',model.officeFull); setMoney(vp,'E21',model.officePart); setMoney(vp,'E22',support); const ins=money(insuranceBase*0.105); setMoney(vp,'E25',ins)
+      setValue(vp,'E10',employee.name); setValue(vp,'E11','VP'); setValue(vp,'E17',payslip.overrides?.bank??employee.bank??''); setValue(vp,'E18',payslip.overrides?.account??employee.account??''); setValue(vp,'E14',n(payslip.overrides?.leaveDays?.compensatory));setValue(vp,'E15',n(payslip.overrides?.leaveDays?.unpaid));setValue(vp,'E16',n(payslip.overrides?.leaveDays?.paid));setValue(vp,'E13',model.officeHours||0); setMoney(vp,'E20',model.officeFull); setMoney(vp,'E21',model.officePart); setMoney(vp,'E22',support); const ins=money(insuranceBase*0.105); setMoney(vp,'E25',ins)
     }
     if (type === 'transfer') {
       const ck=wb.getWorksheet('CK'); if(!ck) continue
@@ -462,4 +462,5 @@ export function makePayslip(employee, period, attendance, sourceRows = null) {
   if (n(employee.salary?.insuranceBase) > 0) { if (hasTeacher) types.push('teacherBH'); if (hasOffice) types.push('officeBH') }
   return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types, createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class||0,assist:employee.salary?.teacher?.assist||0,tutoring:employee.salary?.teacher?.tutoring||0,assistTutoring:employee.salary?.teacher?.assistTutoring||0,full:employee.salary?.office?.full||0,part:employee.salary?.office?.part||0},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
 }
+
 
