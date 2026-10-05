@@ -42,6 +42,7 @@ function normalizePersonName(value) {
 function samePerson(a, b) { return normalizePersonName(a) === normalizePersonName(b) }
 function effectiveRate(rate, className, employee, mode='') {
   const name = String(className || '')
+  if (mode === 'teacher' && employee?.salary?.special4 && hasPct(name)) return 170000
   if (employee?.salary?.special3 && /IELTS\s*-\s*56%\s*ONL/i.test(name)) return n(rate)
   if (mode === 'tutoring' && employee?.salary?.special2 && /ONL/i.test(name)) return n(rate) * 0.8
   if (employee?.salary?.special1 && /%/.test(name)) return n(rate) * 0.8
