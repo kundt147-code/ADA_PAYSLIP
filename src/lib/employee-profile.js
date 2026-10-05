@@ -1,6 +1,6 @@
 const PROFILE_KEYS=['email','startDate','endDate','resigned','documents']
 export function employeeProfile(emp){return {email:emp.email||'',startDate:emp.startDate||'',endDate:emp.endDate||'',resigned:!!emp.resigned,documents:emp.documents||[]}}
-export function decodeEmployee(emp){return {...emp,...employeeProfile({...emp,...emp.salary?.employeeProfile})}}
+export function decodeEmployee(emp){if(emp.salary?.special3&&emp.salary?.special4)emp={...emp,salary:{...emp.salary,special3:false}};return {...emp,...employeeProfile({...emp,...emp.salary?.employeeProfile})}}
 export function encodeEmployee(emp){const row={...emp,salary:{...emp.salary,employeeProfile:employeeProfile(emp)}};for(const key of PROFILE_KEYS)delete row[key];return row}
 export function validateEmployment(emp){if(emp.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emp.email))return 'Email chưa đúng định dạng.';if(emp.startDate&&emp.endDate&&emp.endDate<emp.startDate)return 'Ngày nghỉ làm không thể trước ngày vào làm.';return ''}
 export function employeeGroup(employees,resigned){return employees.filter(e=>!!e.resigned===resigned)}

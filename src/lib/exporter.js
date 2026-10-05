@@ -12,7 +12,7 @@ const setValue = (ws, cell, value) => { ws.getCell(cell).value = value ?? '' }
 const setMoney = (ws, cell, value) => {
   const c = ws.getCell(cell)
   c.value = value === '' || value == null ? '' : money(value)
-  c.numFmt = MONEY_FMT
+  if(!c.numFmt||c.numFmt==='General')c.numFmt=MONEY_FMT
 }
 const clearCell = (ws, cell) => { ws.getCell(cell).value = ''; }
 
@@ -54,6 +54,7 @@ function rowsFor(payslip, employee, attendance) {
   return attendance.filter(x => x.period === payslip.period && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name) || samePerson(x.employee, employee.name)))
 }
 
+function validPlacementRow(x){return !!(x&&x.date&&x.student&&(x.teacher||x.employee)&&n(x.amount??20000)>=0)}
 function validTeacherRow(x) {
   return !!(x && x.date && x.className && (x.start || x.end || n(x.hours) > 0) && n(x.hours) > 0)
 }
@@ -70,7 +71,7 @@ function uniqueRows(rows) {
 }
 
 function buildModel(employee, payslip, attendance) {
-  const rows = uniqueRows(rowsFor(payslip, employee, attendance)).filter(x => x.category === 'Văn phòng' ? validOfficeRow(x) : validTeacherRow(x))
+  const rows = uniqueRows(rowsFor(payslip, employee, attendance)).filter(x => x.category === 'Văn phòng' ? validOfficeRow(x) : /placement test/i.test(x.category||'') ? validPlacementRow(x) : validTeacherRow(x))
   const overrides = payslip.overrides || {}
   const rates = overrides.rates || {}
   const classRate = n(rates.class ?? employee.salary?.teacher?.class)
@@ -102,7 +103,7 @@ function buildModel(employee, payslip, attendance) {
     ? n(overrides.officeHours)
     : officeRows.reduce((s, x) => s + n(x.hours), 0)
   const officeTotal = officeFull + officePart * officeHours
-  const placement = rows.filter(x => x.category === 'Placement test' && (samePerson(x.teacher, employee.name) || samePerson(x.employee, employee.name)))
+  const placement = rows.filter(x => /^Placement Test$/i.test(x.category||'') && (samePerson(x.teacher, employee.name) || samePerson(x.employee, employee.name)))
 
   return { common, assist, tutoring, assistTutoring, officeFull, officePart, officeHours, officeTotal, placement }
 }
@@ -363,14 +364,20 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
       setCommonPeriod(gv,{title:'A6',month:'B7',year:'E7'},'PHIẾU THANH TOÁN TIỀN LƯƠNG_')
       setValue(gv,'B8',employee.name); setValue(gv,'B9',employee.position||'Giáo viên'); setValue(gv,'B10',payslip.overrides?.bank??employee.bank??''); setValue(gv,'E10',payslip.overrides?.account??employee.account??'')
       setMoney(gv,'D12',n(rates.class??employee.salary?.teacher?.class)); setMoney(gv,'D13',n(rates.tutoring??employee.salary?.teacher?.tutoring)); setMoney(gv,'D14',n(rates.assist??employee.salary?.teacher?.assist))
-      if(model.officeFull) setMoney(gv,'D15',model.officeFull); else clearCell(gv,'D15'); if(insuranceBase) setMoney(gv,'D16',insuranceBase); else clearCell(gv,'D16')
+      setMoney(gv,'D15',n(rates.assistTutoring??employee.salary?.teacher?.assistTutoring));setMoney(gv,'D16',20000)
+      if(model.officeFull)setMoney(gv,'D17',model.officeFull);else clearCell(gv,'D17');if(insuranceBase)setMoney(gv,'D18',insuranceBase);else clearCell(gv,'D18')
       let shift=0
-      const cf=fitDetailSection(gv,21,10,model.common.length,31); const ct=writeTeacherRows(gv,21,model.common,cf.totalRow); setValue(gv,`B${cf.totalRow}`,'TỔNG (1)'); setValue(gv,`F${cf.totalRow}`,ct.hours); setMoney(gv,`H${cf.totalRow}`,ct.amount); shift+=cf.delta
-      const af=fitDetailSection(gv,34+shift,5,model.assist.length,39+shift); const at=writeTeacherRows(gv,34+shift,model.assist,af.totalRow); setValue(gv,`B${af.totalRow}`,'TỔNG (2)'); setValue(gv,`F${af.totalRow}`,at.hours); setMoney(gv,`H${af.totalRow}`,at.amount); shift+=af.delta
-      const tf=fitDetailSection(gv,42+shift,2,model.tutoring.length,44+shift); const tt=writeTeacherRows(gv,42+shift,model.tutoring,tf.totalRow); setValue(gv,`A${tf.totalRow}`,'TỔNG (3)'); setValue(gv,`F${tf.totalRow}`,tt.hours); setMoney(gv,`H${tf.totalRow}`,tt.amount); shift+=tf.delta
-      const atf=fitDetailSection(gv,47+shift,2,model.assistTutoring.length,49+shift); const att=writeTeacherRows(gv,47+shift,model.assistTutoring,atf.totalRow); setValue(gv,`A${atf.totalRow}`,'TỔNG (3)'); setValue(gv,`F${atf.totalRow}`,att.hours); setMoney(gv,`H${atf.totalRow}`,att.amount); shift+=atf.delta
-      const placement=52+shift; setMoney(gv,`H${placement}`,0); const officeStart=53+shift; setMoney(gv,`F${officeStart+1}`,model.officeFull); setMoney(gv,`F${officeStart+2}`,model.officePart); setValue(gv,`F${officeStart+3}`,model.officeHours||0); setMoney(gv,`F${officeStart+4}`,model.officeTotal)
-      const ins=money(insuranceBase*0.105); const take=money(model.officeTotal+att.amount+ct.amount+at.amount+tt.amount-ins); clearCell(gv,`D${59+shift}`); setMoney(gv,`D${60+shift}`,ins); gv.getCell(`H${61+shift}`).value={formula:`F${57+shift}+H${placement}+H${atf.totalRow}+H${cf.totalRow}+H${af.totalRow}+H${tf.totalRow}-D${60+shift}`}; setValue(gv,`F${57+shift}`,model.officeTotal)
+      const cf=fitDetailSection(gv,23,10,model.common.length,33);const ct=writeTeacherRows(gv,23,model.common,cf.totalRow);setValue(gv,`B${cf.totalRow}`,'TỔNG (1)');setValue(gv,`F${cf.totalRow}`,ct.hours);setMoney(gv,`H${cf.totalRow}`,ct.amount);shift+=cf.delta
+      const af=fitDetailSection(gv,36+shift,5,model.assist.length,41+shift);const at=writeTeacherRows(gv,36+shift,model.assist,af.totalRow);setValue(gv,`B${af.totalRow}`,'TỔNG (2)');setValue(gv,`F${af.totalRow}`,at.hours);setMoney(gv,`H${af.totalRow}`,at.amount);shift+=af.delta
+      const tf=fitDetailSection(gv,44+shift,2,model.tutoring.length,46+shift);const tt=writeTeacherRows(gv,44+shift,model.tutoring,tf.totalRow);setValue(gv,`A${tf.totalRow}`,'TỔNG (3)');setValue(gv,`F${tf.totalRow}`,tt.hours);setMoney(gv,`H${tf.totalRow}`,tt.amount);shift+=tf.delta
+      const atf=fitDetailSection(gv,49+shift,2,model.assistTutoring.length,51+shift);const att=writeTeacherRows(gv,49+shift,model.assistTutoring,atf.totalRow);setValue(gv,`A${atf.totalRow}`,'TỔNG (3)');setValue(gv,`F${atf.totalRow}`,att.hours);setMoney(gv,`H${atf.totalRow}`,att.amount);shift+=atf.delta
+      const pf=fitDetailSection(gv,54+shift,1,model.placement.length,55+shift);clearDetailRows(gv,pf.firstRow,pf.totalRow-1)
+      model.placement.forEach((x,i)=>{const r=pf.firstRow+i;setValue(gv,`A${r}`,displayDate(x.date));setValue(gv,`B${r}`,x.day||dayName(x.date));setValue(gv,`C${r}`,x.student);setValue(gv,`D${r}`,x.testName||'');setMoney(gv,`H${r}`,x.amount??20000)})
+      setMoney(gv,`H${pf.totalRow}`,model.placement.reduce((sum,x)=>sum+n(x.amount??20000),0));shift+=pf.delta
+      const officeStart=56+shift;setMoney(gv,`F${officeStart+1}`,model.officeFull);setMoney(gv,`F${officeStart+2}`,model.officePart);setValue(gv,`F${officeStart+3}`,model.officeHours||0);setMoney(gv,`F${officeStart+4}`,model.officeTotal)
+      const ins=money(insuranceBase*0.105);clearCell(gv,`D${62+shift}`);setMoney(gv,`D${63+shift}`,ins)
+      gv.getCell(`H${64+shift}`).value={formula:`F${60+shift}+H${pf.totalRow}+H${atf.totalRow}+H${cf.totalRow}+H${af.totalRow}+H${tf.totalRow}-D${63+shift}`}
+
     }
     if (type === 'office' || type === 'officeBH') {
       const vp=wb.getWorksheet(type==='office'?'VP':'VP_BH'); if(!vp) continue
@@ -407,7 +414,7 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
     Object.entries(inputs).forEach(([cell,value])=>setValue(ws,cell,value))
     // Use the employee insurance base with the revised gross and progressive-tax formulas.
     ws.getCell('Q7').value={formula:'AK5'}
-    let takeAddress='H61';ws.eachRow(row=>{if(String(row.getCell(2).value||'').includes('CÒN LẠI THỰC NHẬN'))takeAddress='H'+row.number})
+    let takeAddress='H64';ws.eachRow(row=>{if(String(row.getCell(2).value||'').includes('CÒN LẠI THỰC NHẬN'))takeAddress='H'+row.number})
     ws.getCell('Q8').value={formula:takeAddress+'-Q7'}
   }else{
     const inputs={I5:Number(display.month)||0,J5:employee.name,K5:account,L5:days,M5:transfer,N5:meal,O5:0,R5:support,S5:n(employee.salary?.insuranceBase),AG5:0}
@@ -448,7 +455,7 @@ export async function exportMany(payslips,employees,attendance,folderName){await
 
 export function makePayslip(employee, period, attendance, sourceRows = null) {
   const lineEdits = sourceRows ? structuredClone(sourceRows) : attendance.filter(x => x.period === period && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name) || samePerson(x.employee, employee.name)))
-  const hasTeacher = lineEdits.some(x => ['Lớp chung','Phụ đạo','Lớp kèm','Phụ đạo kèm'].includes(x.category) && validTeacherRow(x))
+  const hasTeacher = lineEdits.some(x => (['Lớp chung','Phụ đạo','Lớp kèm','Phụ đạo kèm'].includes(x.category) && validTeacherRow(x)) || (/^Placement Test$/i.test(x.category||'') && validPlacementRow(x)))
   const hasOffice = lineEdits.some(x => x.category === 'Văn phòng') || !!(employee.salary?.office?.full || employee.salary?.office?.part)
   const types = [...(hasTeacher ? ['teacher'] : []), ...(hasOffice ? ['office'] : [])]
   if (n(employee.salary?.transfer) > 0) types.push('transfer')
