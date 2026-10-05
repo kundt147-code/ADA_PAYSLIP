@@ -15,3 +15,12 @@ body,.app{background:#f1f6f2!important}.topbar{box-shadow:0 2px 12px #164b3510!i
 /* Search clear control: lightweight icon; slightly thinner focus ring. */
 .name-filter-wrap .clear-filter,.global-search-wrap .clear-search{background:transparent!important;border:0!important;color:#648373!important;border-radius:5px!important;font-family:Arial,sans-serif!important;font-size:18px!important;font-weight:400!important;width:22px!important;height:22px!important;min-height:22px!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;box-shadow:none!important}.name-filter-wrap .clear-filter:hover,.global-search-wrap .clear-search:hover{background:#edf4ef!important;color:#245d42!important}.name-filter-wrap input:focus-visible,.global-search-wrap input:focus-visible{outline-width:1px!important;outline-offset:2px!important}
 .name-filter-wrap .clear-filter,.global-search-wrap .clear-search{top:50%!important;bottom:auto!important;transform:translateY(-50%)!important;margin:0!important}.name-filter-wrap .clear-filter svg,.global-search-wrap .clear-search svg{display:block!important;flex:none!important;width:12px!important;height:12px!important;margin:0!important;pointer-events:none}
+/* Compact salary mechanisms; a single priority note beside section 05. */
+.special-section .employee-section-title>div{flex:1;min-width:0}
+.special-heading-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.special-priority{font-size:10px!important;font-weight:400!important;color:#73877b;white-space:nowrap}
+.special-section .special-rules-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.special-section .special-rule{min-height:0!important;padding:12px!important;gap:10px!important}
+.special-section .special-rule b{font-size:12px!important;line-height:1.4!important}
+.special-section .special-rule small{font-size:11px!important;line-height:1.45!important;margin-top:3px!important}
+@media(max-width:600px){.special-section .special-rules-grid{grid-template-columns:1fr}.special-heading-row{gap:6px}.special-priority{font-size:9px!important}.special-heading-row b{font-size:12px!important}}
