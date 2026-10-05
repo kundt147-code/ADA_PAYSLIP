@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {attendanceRoleHours} from '../src/lib/attendance-stats.js';
+test('selected person hours are split by own GV/TG role',()=>{const rows=[{teacher:'An',ta:'Bình',hours:2},{teacher:'Bình',ta:'An',hours:1}];assert.deepEqual(attendanceRoleHours(rows,'An'),{main:2,assist:1});assert.deepEqual(attendanceRoleHours(rows,'Bình'),{main:1,assist:2});assert.deepEqual(attendanceRoleHours(rows),{main:3,assist:3})});
+test('same person in both columns is not counted twice; empty roles ignored',()=>{assert.deepEqual(attendanceRoleHours([{teacher:' An ',ta:'an',hours:1},{hours:10},{ta:'An',hours:2}], 'An'),{main:1,assist:2})});
