@@ -1,10 +1,11 @@
+import {fetchWithTimeout} from './network.js'
 import {decodeEmployee,encodeEmployee} from './employee-profile.js'
 import { createClient } from '@supabase/supabase-js'
 import { readEmployeesLocal, writeEmployeesLocal } from './storage'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-export const supabase = url && key ? createClient(url,key) : null
+export const supabase = url && key ? createClient(url,key,{global:{fetch:fetchWithTimeout}}) : null
 
 export async function listEmployees() {
   if (!supabase) return readEmployeesLocal().map(decodeEmployee)
