@@ -1,0 +1,3 @@
+import {useEffect,useRef} from 'react';
+// Batch local snapshots while retaining the latest state on refresh/close.
+export function useLocalSnapshot(write,rows){const latest=useRef(rows);latest.current=rows;useEffect(()=>{const timer=setTimeout(()=>write(rows),400);return()=>clearTimeout(timer)},[write,rows]);useEffect(()=>{const flush=()=>write(latest.current);const hidden=()=>{if(document.hidden)flush()};window.addEventListener('pagehide',flush);window.addEventListener('beforeunload',flush);document.addEventListener('visibilitychange',hidden);return()=>{flush();window.removeEventListener('pagehide',flush);window.removeEventListener('beforeunload',flush);document.removeEventListener('visibilitychange',hidden)}},[write])}
