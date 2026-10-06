@@ -4,7 +4,7 @@ export async function previewGrid(buf,sheet){
     const wanted=[sheet]
     for(const name of wanted){
      const ws=wb.getWorksheet(name);if(!ws)continue
-     const maxRows=Math.min(ws.rowCount,120);let meaningfulCols=1
+     const maxRows=ws.rowCount;let meaningfulCols=1
      ws.eachRow((row,r)=>{if(r<=maxRows)row.eachCell(cell=>{if(cell.value!==null&&cell.value!==undefined)meaningfulCols=Math.max(meaningfulCols,cell.col)})})
      const maxCols=Math.min(meaningfulCols,80)
      const merges=Object.values(ws._merges||{}).map(m=>m.model||m).filter(m=>m.top<=maxRows&&m.left<=maxCols)

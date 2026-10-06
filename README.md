@@ -78,3 +78,24 @@ Bản ZIP chứa source, mẫu Excel, kiểm tra và hướng dẫn; không ch�
 ## Sửa ô chọn bảng Nhân viên (Round 34)
 
 Ô chọn từng dòng và chọn tất cả không còn bị khóa theo trạng thái tải/lưu dữ liệu. Đây chỉ là lựa chọn trong giao diện. Nút xóa đã chọn vẫn khóa lúc bận xử lý. Màu chữ Dữ liệu trống và các quy tắc bảo hiểm của Round 33 giữ nguyên.
+
+# Web V39 — Round 35
+
+- Lọc chấm công từ ngày đến ngày, bao gồm hai ngày biên, kết hợp kỳ/tên/chi nhánh. Tổng giờ, tiền test và số dòng tính theo kết quả lọc. Có nút bỏ lọc ngày.
+- BH đặc biệt chỉ thay dòng trừ BH bảng lương phía dưới MS4/MS5. Bảng trắng phía trên dùng công thức gốc kể cả khi BH đặc biệt bằng 0. MS3 giữ quy tắc đã chốt ở Round 33.
+- Hai folder gốc: CHUYỂN KHOẢN TỪ TK CÔNG TY và THANH TOÁN TIỀN MẶT. Giữ nguyên cơ chế folder nhân viên (câu hỏi chưa yêu cầu sửa).
+- Hiển thị nhân viên đã lưu trên máy ngay; cập nhật cache sau lần tải thành công. Chấm công/phiếu tiếp tục dùng dữ liệu local hiện có trong khi tải.
+- Tải nền mỗi 60 giây thay 15 giây; bỏ qua khi tab ẩn, không tải nhân viên chồng nhau, thử lại giãn dần tối đa 5 phút khi lỗi. Dữ liệu không đổi không thay state chấm công/phiếu, giảm dựng lại xem trước.
+- Thanh trên có biểu tượng xoay và Đang tải dữ liệu/Đang lưu dữ liệu/Đã đồng bộ. Lỗi kết nối hiển thị Chưa đồng bộ và Thử lại, không lặp banner lỗi tải nền.
+
+Kiểm tra: 83/83 tests đạt; Vite build đạt; Chrome kiểm tra khoảng ngày, tổng giờ, bỏ lọc, không lỗi JavaScript. Chưa đo tốc độ với dữ liệu Supabase thật; chưa triển khai website công khai. Không thay SQL, không làm lại app Desktop trong đợt này.
+
+Quy tắc Round 35 thay thế các mô tả cũ về BH đặc biệt trong bảng trắng MS4/MS5.
+
+# Web V40 — Chi tiết ngày nghỉ
+Chi tiết nhập ở cửa sổ thứ 3 được đặt thành bảng 4 cột ngay dưới nội dung mẫu GV/VP/GV_BH/VP_BH, cách nội dung cũ hai dòng. Không chèn lên công thức hay dữ liệu mẫu. Không tạo sheet chi tiết riêng nữa. MS3 giữ nguyên. Dòng trống không xuất, số ngày 0 vẫn xuất. Mở rộng vùng in và bỏ giới hạn 120 dòng của preview để xem đủ dữ liệu.
+83 kiểm tra hiện có đạt; thêm 1 kiểm tra trên 4 mẫu đạt: đối chiếu toàn bộ giá trị ô mẫu không đổi, số 0 được giữ, vùng in và preview chứa chi tiết cuối khi trên 120 dòng. Vite build đạt. Chưa triển khai link web.
+
+# Web V41 — Chi tiết ngày nghỉ
+Chi tiết nhập ở cửa sổ thứ 3 được đặt thành bảng 4 cột bên phải bảng lương GV/VP/GV_BH/VP_BH, ngay dưới vùng bảng bảo hiểm/chuyển khoản, cách nội dung cũ hai dòng. Không chèn lên công thức hay dữ liệu mẫu. Không tạo sheet chi tiết riêng nữa. MS3 giữ nguyên. Dòng trống không xuất, số ngày 0 vẫn xuất. Mở rộng vùng in và bỏ giới hạn 120 dòng của preview để xem đủ dữ liệu.
+84 kiểm tra đạt; kiểm tra trên 4 mẫu đạt: đối chiếu toàn bộ giá trị ô mẫu không đổi, số 0 được giữ, vùng in và preview chứa chi tiết cuối khi trên 120 dòng. Vite build đạt. Chưa triển khai link web.

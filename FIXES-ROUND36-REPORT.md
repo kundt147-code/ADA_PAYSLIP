@@ -1,0 +1,3 @@
+# Web V41 — Chi tiết ngày nghỉ
+Chi tiết nhập ở cửa sổ thứ 3 được đặt thành bảng 4 cột bên phải bảng lương GV/VP/GV_BH/VP_BH, ngay dưới vùng bảng bảo hiểm/chuyển khoản, cách nội dung cũ hai dòng. Không chèn lên công thức hay dữ liệu mẫu. Không tạo sheet chi tiết riêng nữa. MS3 giữ nguyên. Dòng trống không xuất, số ngày 0 vẫn xuất. Mở rộng vùng in và bỏ giới hạn 120 dòng của preview để xem đủ dữ liệu.
+84 kiểm tra đạt; kiểm tra trên 4 mẫu đạt: đối chiếu toàn bộ giá trị ô mẫu không đổi, số 0 được giữ, vùng in và preview chứa chi tiết cuối khi trên 120 dòng. Vite build đạt. Chưa triển khai link web.

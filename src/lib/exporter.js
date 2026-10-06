@@ -411,10 +411,15 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
   // File export phải là dữ liệu tĩnh: tính toàn bộ công thức rồi loại bỏ công thức khỏi workbook.
   calculateAndStripFormulas(wb)
   for(const ws of wb.worksheets){const row=ws.name==='CK'?6:7;for(const column of ['B','E']){const cell=ws.getCell(column+row);cell.numFmt='0';cell.alignment={...cell.alignment,horizontal:'left',indent:0}}}
-  if((payslip.overrides?.leaveDetails||[]).length&&types.some(t=>t!=='transfer')){
-    const detail=wb.addWorksheet('Chi tiết ngày nghỉ');detail.addRow(['Nhân viên',employee.name,'Chi nhánh',payslip.branch??employee.branch??'']);detail.addRow(['Chi tiết','Thời gian','Số ngày','Ghi chú']);
-    for(const r of payslip.overrides.leaveDetails)detail.addRow([r.detail||'',r.time||'',hasData(r.days)?n(r.days):'',r.note||'']);
-    [32,24,14,48].forEach((w,i)=>detail.getColumn(i+1).width=w);detail.eachRow(r=>{r.height=25;r.eachCell(c=>{c.font={name:'Times New Roman',size:12};c.alignment={wrapText:true,vertical:'middle'}})});detail.getRow(2).font={name:'Times New Roman',size:12,bold:true};
+  const leaveDetails=(payslip.overrides?.leaveDetails||[]).filter(r=>[r.detail,r.time,r.days,r.note].some(hasData))
+  if(leaveDetails.length)for(const ws of wb.worksheets){
+    if(ws.name==='CK')continue
+    const left=ws.name.startsWith('GV')?12:9,right=left+7;let occupied=8;ws.eachRow(row=>row.eachCell(cell=>{if(cell.col>=left&&cell.value!==null&&cell.value!==undefined)occupied=Math.max(occupied,row.number)}));for(const merge of Object.values(ws._merges||{})){const m=merge.model||merge;if(m.right>=left)occupied=Math.max(occupied,m.bottom)}const start=occupied+3,groups=[[left,left+1],[left+2,left+3],[left+4,left+4],[left+5,right]]
+    ws.mergeCells(start,left,start,right);ws.getCell(start,left).value='CHI TIẾT NGÀY NGHỈ'
+    const content=[['Chi tiết','Thời gian','Số ngày','Ghi chú'],...leaveDetails.map(r=>[r.detail||'',r.time||'',hasData(r.days)?n(r.days):'',r.note||''])]
+    for(let i=0;i<content.length;i++){const row=start+1+i;groups.forEach(([left,right],j)=>{if(right>left)ws.mergeCells(row,left,row,right);const c=ws.getCell(row,left);c.value=content[i][j];if(j===2&&i)c.numFmt='0.##'})}
+    for(let row=start;row<=start+content.length;row++){const header=row<=start+1;ws.getRow(row).height=header?28:Math.max(32,24*Math.ceil(Math.max(...content[row-start-1].map(v=>String(v).length))/35));for(let col=left;col<=right;col++){const c=ws.getCell(row,col);c.font={name:'Times New Roman',size:12,bold:header,color:{argb:'FF234D3E'}};c.alignment={vertical:'middle',wrapText:true,horizontal:header?'center':'left'};c.border={top:{style:'thin',color:{argb:'FFB8CEC2'}},bottom:{style:'thin',color:{argb:'FFB8CEC2'}},left:{style:'thin',color:{argb:'FFB8CEC2'}},right:{style:'thin',color:{argb:'FFB8CEC2'}}};if(header)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:row===start?'FFDDECE3':'FFF0F6F2'}}}}
+    const last=Math.max(ws.rowCount,start+content.length);ws.pageSetup.printArea='A1:'+ws.getColumn(Math.max(8,ws.columnCount)).letter+last
   }
   return wb
 }
@@ -441,7 +446,7 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
   }
   const assigned=payslip.overrides?.insuranceAmount??insuranceAmount(employee)
   const custom=employee.salary?.specialInsurance&&hasData(employee.salary?.insuranceAmount)
-  if(custom||payslip.overrides?.insuranceAmount!==undefined){
+  if(!custom&&payslip.overrides?.insuranceAmount!==undefined){
     const cols=teacher?['W5','X5','Y5','Z5','AA5','AD5','AE5','AF5']:['T5','U5','V5','W5','X5','AA5','AB5','AC5']
     if(custom||assigned===0)for(const cell of cols)setValue(ws,cell,0)
     setValue(ws,teacher?'AG5':'AD5',money(assigned))
@@ -457,7 +462,7 @@ export function payslipGross(p,e,attendance){const m=buildModel(e,p,attendance);
 export async function buildPayslipZip(payslips,employees,attendance,{summaries=false}={}){
  payslips=payslips.map(p=>({...p,types:activePayslipTypes(p)}))
  const zip=new JSZip(),folders=new Map(),usedFolders=new Set(),bufferCache=new Map();const getBuffer=async(p,e,type)=>{if(!bufferCache.has(p))bufferCache.set(p,new Map());const cached=bufferCache.get(p);if(!cached.has(type))cached.set(type,await payslipBuffer(p,e,attendance,type));return cached.get(type)}
- zip.folder('Chuyển khoản từ TK Công ty');zip.folder('Thanh toán tiền mặt');for(const b of ['PHÚ NHUẬN','TÂN PHÚ'])for(const role of ['GIÁO VIÊN','VĂN PHÒNG'])zip.folder('Thanh toán tiền mặt/PAYSLIP_'+b+'_'+role);
+ zip.folder('CHUYỂN KHOẢN TỪ TK CÔNG TY');zip.folder('THANH TOÁN TIỀN MẶT');for(const b of ['PHÚ NHUẬN','TÂN PHÚ'])for(const role of ['GIÁO VIÊN','VĂN PHÒNG'])zip.folder('THANH TOÁN TIỀN MẶT/PAYSLIP_'+b+'_'+role);
  for(const p of payslips){
   const e=employees.find(e=>e.id===p.employeeId);if(!e)continue
   if(employeeBranches(e).length>1&&p.branch===undefined)throw Error(e.name+': phiếu cũ chưa phân chi nhánh. Hãy Khởi tạo lại trước khi xuất.');
@@ -469,13 +474,13 @@ export async function buildPayslipZip(payslips,employees,attendance,{summaries=f
   if(!groups.length&&types.includes('transfer'))groups.push([/(?:^|;)\s*(GV|TG)\s*(?:;|$)/i.test(e.position||'')?'GIÁO VIÊN':'VĂN PHÒNG',['transfer']])
   const buffers=new Map()
   for(const [group,groupTypes] of groups){
-   const root='Thanh toán tiền mặt/PAYSLIP_'+branch+'_'+group+'/'
+   const root='THANH TOÁN TIỀN MẶT/PAYSLIP_'+branch+'_'+group+'/'
    let parent=root
    if(groupTypes.length>1){const key=root+'|'+e.id;if(!folders.has(key)){let name=safeFile(e.name),i=2;while(usedFolders.has(root+name))name=safeFile(e.name)+'_'+i++;usedFolders.add(root+name);folders.set(key,root+name+'/')}parent=folders.get(key)}
    for(const type of groupTypes){
     const role=({teacher:'GV',teacherBH:'GV',office:'VP',officeBH:'VP'})[type]
     const name=['PAYSLIP',safeFile(e.name),role,rawBranch?safeFile(rawBranch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
-    const fileParent=type==='transfer'&&e.salary?.companyTransfer?'Chuyển khoản từ TK Công ty/':parent;
+    const fileParent=type==='transfer'&&e.salary?.companyTransfer?'CHUYỂN KHOẢN TỪ TK CÔNG TY/':parent;
     let path=fileParent+name,i=2;while(zip.file(path))path=fileParent+name.replace(/\.xlsx$/,'_'+i+++'.xlsx')
     if(!buffers.has(type))buffers.set(type,await getBuffer(p,e,type))
     zip.file(path,buffers.get(type))
