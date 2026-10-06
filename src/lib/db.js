@@ -10,7 +10,7 @@ export const supabase = url && key ? createClient(url,key,{global:{fetch:fetchWi
 export async function listEmployees() {
   if (!supabase) return readEmployeesLocal().map(decodeEmployee)
   const rows=[]
-  for(let from=0;;from+=500){const {data,error}=await supabase.from('employees').select('*').order('name').order('id').range(from,from+499);if(error)throw error;rows.push(...(data||[]));if((data||[]).length<500)break}
+  for(let from=0;;from+=250){const {data,error}=await supabase.from('employees').select('*').order('name').order('id').range(from,from+249);if(error)throw error;rows.push(...(data||[]));if((data||[]).length<250)break}
   writeEmployeesLocal(rows);return rows.map(decodeEmployee)
 }
 export async function upsertEmployee(emp) {

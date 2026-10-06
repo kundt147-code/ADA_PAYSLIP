@@ -99,3 +99,11 @@ Chi tiết nhập ở cửa sổ thứ 3 được đặt thành bảng 4 cột n
 # Web V41 — Chi tiết ngày nghỉ
 Chi tiết nhập ở cửa sổ thứ 3 được đặt thành bảng 4 cột bên phải bảng lương GV/VP/GV_BH/VP_BH, ngay dưới vùng bảng bảo hiểm/chuyển khoản, cách nội dung cũ hai dòng. Không chèn lên công thức hay dữ liệu mẫu. Không tạo sheet chi tiết riêng nữa. MS3 giữ nguyên. Dòng trống không xuất, số ngày 0 vẫn xuất. Mở rộng vùng in và bỏ giới hạn 120 dòng của preview để xem đủ dữ liệu.
 84 kiểm tra đạt; kiểm tra trên 4 mẫu đạt: đối chiếu toàn bộ giá trị ô mẫu không đổi, số 0 được giữ, vùng in và preview chứa chi tiết cuối khi trên 120 dòng. Vite build đạt. Chưa triển khai link web.
+
+# Web V42 — Một vị trí hiển thị đồng bộ
+Bỏ khung vàng dưới header. Trạng thái tải/lưu, lỗi kết nối/timeout và Thử lại hiển thị tại vị trí màu xanh trên header. Biểu tượng chỉ xoay khi có yêu cầu đang chạy; khi thử lại ưu tiên chữ Đang tải dữ liệu. Thông báo lỗi lưu dùng chung cũng đưa vào cùng vị trí. Giữ thông báo thao tác nghiệp vụ riêng. Vite build thành công. Chưa triển khai website.
+
+# Web V43 — Đồng bộ
+Nguyên nhân xác nhận trong source: refresh chờ flush hết hàng đợi trước khi đọc; lô 50 dòng không giới hạn số byte; tải dữ liệu hai bảng dùng Promise.all làm lỗi một bảng chặn áp dụng bảng còn lại; có thể đọc trùng khi migration/refresh cùng chạy.
+Sửa: đọc trước và gửi ở nền độc lập; áp dụng từng bảng đọc thành công, chỉ mở chỉnh sửa khi cả hai đã có bản tải thành công; chia lô ghi tối đa 128 KiB hoặc 50 dòng (một dòng lớn hơn giới hạn gửi riêng); debounce ghi 300ms; chia đọc phiếu 50 dòng và chấm công/nhân viên 250 dòng; gộp đọc đang chạy; hàng đợi pending vẫn lưu và chỉ xóa sau xác nhận thành công. Tự thử đọc mỗi 30 giây, backoff lỗi tối đa 5 phút, bỏ qua tab ẩn. Trạng thái đang gửi hiển thị số dòng chờ, lỗi đọc/lưu cùng trên header; nút Thử lại ép thử đọc và ghi.
+87 kiểm tra đạt và Vite build đạt. Chrome fixture chứng minh dữ liệu mở được trong khi gửi bị treo, chỉ một writer, pending chỉ xóa sau phản hồi thành công. Đo trực tiếp Supabase bị kết nối máy kiểm tra chặn, chưa xác định được tình trạng server hoặc đo thời gian tải trên dữ liệu thật. Chưa triển khai website. Không cần đổi SQL. Khi tải nhiều dòng, tổng lượt đọc có thể tăng nhưng từng lượt nhỏ hơn để giảm nguy cơ timeout; vẫn tải toàn bộ dữ liệu, chưa áp dụng đồng bộ incremental phía server.
