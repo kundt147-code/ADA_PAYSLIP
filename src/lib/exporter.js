@@ -414,7 +414,7 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
     const inputs={L5:Number(display.month)||0,M5:employee.name,N5:account,O5:days,P5:transfer,Q5:meal,R5:0,U5:support,V5:n(employee.salary?.insuranceBase),AJ5:0}
     Object.entries(inputs).forEach(([cell,value])=>setValue(ws,cell,value))
     // Use the employee insurance base with the revised gross and progressive-tax formulas.
-    ws.getCell('Q7').value={formula:'AK5'}
+    ws.getCell('Q7').value=(payslip.types||[]).includes('officeBH')?0:{formula:'AK5'}
     let takeAddress='H64';ws.eachRow(row=>{if(String(row.getCell(2).value||'').includes('CÒN LẠI THỰC NHẬN'))takeAddress='H'+row.number})
     ws.getCell('Q8').value={formula:takeAddress+'-Q7'}
   }else{
