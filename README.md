@@ -1,43 +1,64 @@
-# PAYSLIP ADA
+# PAYSLIP web V36 — Round 32
 
-Web quản lý thông tin nhân viên, chấm công và phiếu lương.
+Bản cập nhật web để kiểm tra các quy tắc mới. Bản ứng dụng Windows chưa thay đổi.
 
-## Template phiếu lương
-`public/payslip-template.xlsx` là bản sao nguyên gốc của `Bảng lương mẫu(1).xlsx`.
+## Những điểm đã chốt
 
-Khi export:
-- Giữ layout, logo, merge, font và định dạng của template.
-- Dữ liệu được ghi đúng vị trí theo 2 sheet `GV` và `VP`.
-- Các ô công thức của template được tính theo đúng công thức hiện có rồi xuất **giá trị**, không xuất công thức.
-- Tiền được xuất dạng Accounting, không kèm đơn vị tiền.
-- Nếu số dòng chấm công vượt số dòng mẫu, hệ thống chèn thêm dòng trước dòng tổng và giữ style của dòng mẫu.
+- Ô trống là chưa có dữ liệu; số 0 là có dữ liệu. Import, hồ sơ và export nhân viên giữ sự khác biệt này.
+- Phần 3 có “Chuyển khoản từ tài khoản công ty”; phần 4 có cơ chế BH đặc biệt và số tiền nhập trực tiếp, kể cả 0.
+- Công thức thu nhập tính thuế, thuế và chuyển khoản sau BH của mẫu vẫn giữ. BH đặc biệt ghi trực tiếp vào tổng BH, không phân bổ lại theo các tỷ lệ BH thành phần.
+- Chấm công nhập riêng theo chi nhánh đang chọn. Có đủ các loại lớp, Placement Test và Văn phòng ở mỗi chi nhánh. Chi nhánh mới trong hồ sơ tự xuất hiện trong lựa chọn.
+- Một người làm hai chi nhánh có hai phiếu riêng. **Lương VP Full và khoản chuyển khoản cố định dùng cùng mức tại cả hai chi nhánh**, theo xác nhận của người dùng.
+- Toàn bộ BH trừ tại một chi nhánh đủ lương, chọn lương cao hơn; bằng nhau chọn PN. Nếu không nơi nào đủ lương, phải chọn chi nhánh nhận toàn bộ khoản trừ.
+- Bước số ngày nghỉ dùng nút Xác nhận. Các ô chưa nhập bỏ qua bước chi tiết; nhập 0 vẫn là đã nhập. Bước chi tiết cho đổi nhân viên, thêm dòng, giữ dữ liệu khi đổi người và bấm Xong khi chưa có lý do. Chi tiết được lưu trong phiếu và xuất thành sheet kèm khi có nội dung.
 
-## Import chấm công
-Một file Excel mẫu có 4 sheet:
-- Lớp chung
-- Lớp phụ đạo
-- Lớp kèm
-- Văn phòng
+## Các mẫu được giữ khi xuất
 
-Ba sheet lớp dùng 8 cột:
-`Ngày | Thứ | Tên lớp | Giờ bắt đầu | Giờ kết thúc | Tổng giờ | Tên GV | Tên TG`
+| Có các mẫu | Giữ |
+|---|---|
+| 1 và 2 | 1 |
+| 4 và 5 | 4 |
+| 1 và 4 | 4 |
+| 2 và 5 | 5 |
+| Đủ 1, 2, 3, 4, 5 | 4 và 3 |
 
-Sheet Văn phòng dùng 6 cột:
-`Ngày | Thứ | Tên nhân viên | Giờ in | Giờ out | Tổng số giờ`
+MS3 luôn được giữ khi có dữ liệu chuyển khoản. Khi 2/5 được giữ, MS3 đi cùng 2/5; nếu 2/5 được gộp vào 1/4 thì MS3 đi cùng mẫu được giữ.
 
-## Chạy
-```powershell
-npm.cmd install
-npm.cmd run dev
+## Cấu trúc ZIP xuất phiếu
+
+```
+Chuyển khoản từ TK Công ty/
+    MS3 của nhân viên có chọn chuyển khoản từ TK công ty
+Thanh toán tiền mặt/
+    PAYSLIP_PHÚ NHUẬN_GIÁO VIÊN/
+    PAYSLIP_PHÚ NHUẬN_VĂN PHÒNG/
+    PAYSLIP_TÂN PHÚ_GIÁO VIÊN/
+    PAYSLIP_TÂN PHÚ_VĂN PHÒNG/
+    GIỜ DẠY KÈM...
+    TỔNG LƯƠNG CHUYỂN KHOẢN...
+    TỔNG LƯƠNG TIỀN MẶT...
 ```
 
-## V35 – latest fixes
-- Chấm công và phiếu lương được lưu bền trong trình duyệt (localStorage), không tự mất khi đóng tab; xóa bằng thao tác chủ động.
-- Import dữ liệu mới là bổ sung, không ghi đè dữ liệu đang có.
-- Import chấm công 5 sheet dùng đúng 5 parser: Lớp chung, Phụ đạo, Lớp kèm, Phụ đạo kèm, Văn phòng; nút giao diện là “Import các lớp”.
-- File mẫu chấm công và nhân viên là Excel Table, Times New Roman 10 và có Note/Comment giải thích từng cột.
-- File mẫu lương chính thức là `public/payslip-template.xlsx`, lấy từ Bảng lương mẫu mới; giữ công thức của 5 mẫu GV/VP/CK/GV_BH/VP_BH.
-- Preview dùng template mới nhỏ hơn và không xóa công thức khỏi workbook.
-- Phiếu lương: MS3 đi kèm khi có Lương chuyển khoản; MS4/MS5 đi kèm tương ứng khi có Mức đóng BH và có GV/VP.
-- Xóa phiếu lương: dùng chọn tất cả/chọn nhiều rồi bấm “Xóa”, không còn nút “Xóa tất cả”.
-- Favicon ADA được khai báo tại `public/favicon.svg`.
+Ba file tổng hợp tạo cho mỗi kỳ xuất; lấy số tiền thực tế từ mẫu đã giữ. MS4 dùng Q7/Q8, MS5 dùng N7/N8. Tách tổng hợp theo từng chi nhánh. Các chi nhánh khác có folder tương ứng khi có phiếu.
+
+## Kiểm tra với dữ liệu đang có
+
+1. Vào Chấm công, chọn “Chưa phân chi nhánh” để xem dữ liệu cũ. Lọc theo người/kỳ/loại lớp rồi chọn nơi chuyển và bấm Chuyển dòng. Web không đoán hoặc tự tách chi nhánh.
+2. Kiểm tra hồ sơ, các ô lương trống/0 và hai lựa chọn mới. File import nhân viên tải về đã thêm ba cột cuối, vẫn giữ hai ví dụ và định dạng mẫu.
+3. Với kỳ đã có phiếu, chọn Khởi tạo lại đã chọn. Thao tác cập nhật cả các phiếu chi nhánh cùng người/cùng kỳ để bảo hiểm chỉ trừ một lần. Dòng chấm công và mức lương được lấy lại từ dữ liệu hiện tại; các chỉnh sửa riêng trên phiếu cần nhập lại nếu có.
+4. Đối chiếu phiếu, file xuất và ba tổng hợp. Phiếu cũ của người có nhiều chi nhánh phải khởi tạo lại trước khi xuất.
+
+## Chạy và đưa bản web lên môi trường hiện tại
+
+Source dùng React + Vite (JavaScript/JSX), xử lý Excel bằng ExcelJS và SheetJS.
+
+```
+npm install
+npm run dev
+npm test
+npm run build
+```
+
+Giữ cấu hình Vercel/Supabase đang dùng: VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY. Không cần SQL migration mới cho đợt này: các trường mới lưu trong JSON lương, chấm công và phiếu hiện có. .env.example chỉ chứa tên biến, không có khóa.
+
+Bản ZIP chứa source, mẫu Excel, kiểm tra và hướng dẫn; không chứa node_modules, dữ liệu trình duyệt hoặc cấu hình bí mật. Chưa triển khai đè lên web công khai.

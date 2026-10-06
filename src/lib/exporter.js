@@ -1,3 +1,4 @@
+import {hasData,activeTypes,insuranceAmount,branchCode,employeeBranches,selectInsuranceBranch} from './payroll-policy.js'
 import {addPayrollSummaries} from './payroll-summaries.js'
 import { writeExcelBuffer } from './xlsx-output.js'
 import ExcelJS from 'exceljs'
@@ -57,10 +58,10 @@ function rowsFor(payslip, employee, attendance) {
 
 function validPlacementRow(x){return !!(x&&x.date&&x.student&&(x.teacher||x.employee)&&n(x.amount??20000)>=0)}
 function validTeacherRow(x) {
-  return !!(x && x.date && x.className && (x.start || x.end || n(x.hours) > 0) && n(x.hours) > 0)
+  return !!(x && x.date && x.className && hasData(x.hours) && n(x.hours) >= 0)
 }
 function validOfficeRow(x) {
-  return !!(x && x.date && x.employee && n(x.hours) > 0)
+  return !!(x && x.date && x.employee && hasData(x.hours) && n(x.hours) >= 0)
 }
 function uniqueRows(rows) {
   const seen = new Set()
@@ -324,6 +325,7 @@ function fillAllPeriodText(ws, display) {
 }
 
 async function workbookFor(payslip, employee, attendance, onlyType = null, signal) {
+  employee={...employee,branch:payslip.branch??employee.branch};
   const wb = await loadTemplate(signal)
   if(wb.getWorksheet('GV_BH')) {
     const source=wb.getWorksheet('GV'), target=wb.getWorksheet('GV_BH')
@@ -366,7 +368,7 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
       setValue(gv,'B8',employee.name); setValue(gv,'B9',employee.position||'Giáo viên'); setValue(gv,'B10',payslip.overrides?.bank??employee.bank??''); setValue(gv,'E10',payslip.overrides?.account??employee.account??'')
       setMoney(gv,'D12',n(rates.class??employee.salary?.teacher?.class)); setMoney(gv,'D13',n(rates.tutoring??employee.salary?.teacher?.tutoring)); setMoney(gv,'D14',n(rates.assist??employee.salary?.teacher?.assist))
       setMoney(gv,'D15',n(rates.assistTutoring??employee.salary?.teacher?.assistTutoring));setMoney(gv,'D16',20000)
-      if(model.officeFull)setMoney(gv,'D17',model.officeFull);else clearCell(gv,'D17');if(insuranceBase)setMoney(gv,'D18',insuranceBase);else clearCell(gv,'D18')
+      if(hasData(rates.full??employee.salary?.office?.full))setMoney(gv,'D17',model.officeFull);else clearCell(gv,'D17');if(hasData(employee.salary?.insuranceBase))setMoney(gv,'D18',insuranceBase);else clearCell(gv,'D18')
       let shift=0
       const cf=fitDetailSection(gv,23,10,model.common.length,33);const ct=writeTeacherRows(gv,23,model.common,cf.totalRow);setValue(gv,`B${cf.totalRow}`,'TỔNG (1)');setValue(gv,`F${cf.totalRow}`,ct.hours);setMoney(gv,`H${cf.totalRow}`,ct.amount);shift+=cf.delta
       const af=fitDetailSection(gv,36+shift,5,model.assist.length,41+shift);const at=writeTeacherRows(gv,36+shift,model.assist,af.totalRow);setValue(gv,`B${af.totalRow}`,'TỔNG (2)');setValue(gv,`F${af.totalRow}`,at.hours);setMoney(gv,`H${af.totalRow}`,at.amount);shift+=af.delta
@@ -375,21 +377,26 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
       const pf=fitDetailSection(gv,54+shift,1,model.placement.length,55+shift);clearDetailRows(gv,pf.firstRow,pf.totalRow-1)
       model.placement.forEach((x,i)=>{const r=pf.firstRow+i;setValue(gv,`A${r}`,displayDate(x.date));setValue(gv,`B${r}`,x.day||dayName(x.date));setValue(gv,`C${r}`,x.student);setValue(gv,`D${r}`,x.testName||'');setMoney(gv,`H${r}`,x.amount??20000)})
       setMoney(gv,`H${pf.totalRow}`,model.placement.reduce((sum,x)=>sum+n(x.amount??20000),0));shift+=pf.delta
-      const officeStart=56+shift;setMoney(gv,`F${officeStart+1}`,model.officeFull);setMoney(gv,`F${officeStart+2}`,model.officePart);setValue(gv,`F${officeStart+3}`,model.officeHours||0);setMoney(gv,`F${officeStart+4}`,model.officeTotal)
-      const ins=money(insuranceBase*0.105);clearCell(gv,`D${62+shift}`);setMoney(gv,`D${63+shift}`,ins)
+      const officeStart=56+shift;setMoney(gv,`F${officeStart+1}`,model.officeFull);setMoney(gv,`F${officeStart+2}`,model.officePart);setValue(gv,`F${officeStart+3}`,model.officeHours||0);setMoney(gv,`F${officeStart+4}`,model.officeTotal-model.officeFull/(display.year&&display.month?new Date(Number(display.year),Number(display.month),0).getDate():30)*n(payslip.overrides?.leaveDays?.unpaid))
+      const ins=money(payslip.overrides?.insuranceAmount??insuranceAmount(employee));clearCell(gv,`D${62+shift}`);setMoney(gv,`D${63+shift}`,ins)
       gv.getCell(`H${64+shift}`).value={formula:`F${60+shift}+H${pf.totalRow}+H${atf.totalRow}+H${cf.totalRow}+H${af.totalRow}+H${tf.totalRow}-D${63+shift}`}
 
     }
     if (type === 'office' || type === 'officeBH') {
       const vp=wb.getWorksheet(type==='office'?'VP':'VP_BH'); if(!vp) continue
       setCommonPeriod(vp,{title:'A6',month:'B7',year:'E7'},'PHIẾU THANH TOÁN TIỀN LƯƠNG_')
-      setValue(vp,'E10',employee.name); setValue(vp,'E11','VP'); setValue(vp,'E17',payslip.overrides?.bank??employee.bank??''); setValue(vp,'E18',payslip.overrides?.account??employee.account??''); setValue(vp,'E14',n(payslip.overrides?.leaveDays?.compensatory));setValue(vp,'E15',n(payslip.overrides?.leaveDays?.unpaid));setValue(vp,'E16',n(payslip.overrides?.leaveDays?.paid));setValue(vp,'E13',model.officeHours||0); setMoney(vp,'E20',model.officeFull); setMoney(vp,'E21',model.officePart); setMoney(vp,'E22',support); const ins=money(insuranceBase*0.105); setMoney(vp,'E25',ins)
+      setValue(vp,'E10',employee.name); setValue(vp,'E11','VP'); setValue(vp,'E17',payslip.overrides?.bank??employee.bank??''); setValue(vp,'E18',payslip.overrides?.account??employee.account??''); setValue(vp,'E14',n(payslip.overrides?.leaveDays?.compensatory));setValue(vp,'E15',n(payslip.overrides?.leaveDays?.unpaid));setValue(vp,'E16',n(payslip.overrides?.leaveDays?.paid));setValue(vp,'E13',model.officeHours||0); setMoney(vp,'E20',model.officeFull); setMoney(vp,'E21',model.officePart); setMoney(vp,'E22',support); const ins=money(payslip.overrides?.insuranceAmount??insuranceAmount(employee)); setMoney(vp,'E25',ins)
     }
     if (type === 'transfer') {
       const ck=wb.getWorksheet('CK'); if(!ck) continue
       setCommonPeriod(ck,{title:'A5',month:'B6',year:'E6'},'PHIẾU THANH TOÁN TIỀN LƯƠNG_')
       setValue(ck,'E9',employee.name); setValue(ck,'E10',employee.position||''); setValue(ck,'E11',payslip.overrides?.bank??employee.bank??''); setValue(ck,'E12',payslip.overrides?.account??employee.account??''); setMoney(ck,'E14',transfer); setMoney(ck,'E15',food); setMoney(ck,'E16',bonus)
       setMoney(ck,'E21',0)
+      if(payslip.overrides?.insuranceAmount!==undefined||employee.salary?.specialInsurance){
+        const deduction=money(payslip.overrides?.insuranceAmount??insuranceAmount(employee));
+        if(employee.salary?.specialInsurance){for(const cell of ['E18','E19','E20'])clearCell(ck,cell);ck.getCell('E22').value={formula:'E21+'+deduction}}
+        else {setMoney(ck,'E18',deduction*8/10.5);setMoney(ck,'E19',deduction*1.5/10.5);setMoney(ck,'E20',deduction-money(deduction*8/10.5)-money(deduction*1.5/10.5))}
+      }
     }
     if (type === 'teacherBH') fillInsuranceSheet(wb.getWorksheet('GV_BH'), employee, payslip, model, display, true)
     if (type === 'officeBH') fillInsuranceSheet(wb.getWorksheet('VP_BH'), employee, payslip, model, display, false)
@@ -400,6 +407,11 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
   // File export phải là dữ liệu tĩnh: tính toàn bộ công thức rồi loại bỏ công thức khỏi workbook.
   calculateAndStripFormulas(wb)
   for(const ws of wb.worksheets){const row=ws.name==='CK'?6:7;for(const column of ['B','E']){const cell=ws.getCell(column+row);cell.numFmt='0';cell.alignment={...cell.alignment,horizontal:'left',indent:0}}}
+  if((payslip.overrides?.leaveDetails||[]).length&&types.some(t=>t!=='transfer')){
+    const detail=wb.addWorksheet('Chi tiết ngày nghỉ');detail.addRow(['Nhân viên',employee.name,'Chi nhánh',payslip.branch??employee.branch??'']);detail.addRow(['Chi tiết','Thời gian','Số ngày','Ghi chú']);
+    for(const r of payslip.overrides.leaveDetails)detail.addRow([r.detail||'',r.time||'',hasData(r.days)?n(r.days):'',r.note||'']);
+    [32,24,14,48].forEach((w,i)=>detail.getColumn(i+1).width=w);detail.eachRow(r=>{r.height=25;r.eachCell(c=>{c.font={name:'Times New Roman',size:12};c.alignment={wrapText:true,vertical:'middle'}})});detail.getRow(2).font={name:'Times New Roman',size:12,bold:true};
+  }
   return wb
 }
 
@@ -414,7 +426,7 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
     const inputs={L5:Number(display.month)||0,M5:employee.name,N5:account,O5:days,P5:transfer,Q5:meal,R5:0,U5:support,V5:n(employee.salary?.insuranceBase),AJ5:0}
     Object.entries(inputs).forEach(([cell,value])=>setValue(ws,cell,value))
     // Use the employee insurance base with the revised gross and progressive-tax formulas.
-    ws.getCell('Q7').value=(payslip.types||[]).includes('officeBH')?0:{formula:'AK5'}
+    ws.getCell('Q7').value={formula:'AK5'}
     let takeAddress='H64';ws.eachRow(row=>{if(String(row.getCell(2).value||'').includes('CÒN LẠI THỰC NHẬN'))takeAddress='H'+row.number})
     ws.getCell('Q8').value={formula:takeAddress+'-Q7'}
   }else{
@@ -423,18 +435,29 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
     ws.getCell('N7').value={formula:'AH5'}
     ws.getCell('N8').value={formula:'E26-N7'}
   }
+  const assigned=payslip.overrides?.insuranceAmount??insuranceAmount(employee)
+  const custom=employee.salary?.specialInsurance&&hasData(employee.salary?.insuranceAmount)
+  if(custom||payslip.overrides?.insuranceAmount!==undefined){
+    const cols=teacher?['W5','X5','Y5','Z5','AA5','AD5','AE5','AF5']:['T5','U5','V5','W5','X5','AA5','AB5','AC5']
+    if(custom||assigned===0)for(const cell of cols)setValue(ws,cell,0)
+    setValue(ws,teacher?'AG5':'AD5',money(assigned))
+  }
 }
 
 export async function payslipBuffer(payslip, employee, attendance, type=null, {signal}={}) { signal?.throwIfAborted(); const wb=await workbookFor(payslip,employee,attendance,type,signal); signal?.throwIfAborted(); const out=await writeExcelBuffer(wb); signal?.throwIfAborted(); return out }
 function safeFile(s){return String(s||'').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').trim().replace(/[. ]+$/g,'')||'UNKNOWN'}
 const typeCode={teacher:'MS1',office:'MS2',transfer:'MS3',teacherBH:'MS4',officeBH:'MS5'}
-export function activePayslipTypes(payslip){const types=[...new Set(payslip.types||[])];return types.filter(t=>!(t==='teacher'&&types.includes('teacherBH'))&&!(t==='office'&&types.includes('officeBH')))}
+export const activePayslipTypes=activeTypes;
+export function payslipGross(p,e,attendance){const m=buildModel(e,p,attendance);const days=p.displayPeriod||p.period;const [y,mo]=days.split('-');const monthDays=Number(y)&&Number(mo)?new Date(Number(y),Number(mo),0).getDate():30;return [...m.common,...m.assist,...m.tutoring,...m.assistTutoring].reduce((s,r)=>s+r.amount,0)+m.placement.reduce((s,r)=>s+n(r.amount??20000),0)+m.officeTotal-m.officeFull/monthDays*n(p.overrides?.leaveDays?.unpaid)+n(e.salary?.support)}
+
 export async function buildPayslipZip(payslips,employees,attendance,{summaries=false}={}){
  payslips=payslips.map(p=>({...p,types:activePayslipTypes(p)}))
  const zip=new JSZip(),folders=new Map(),usedFolders=new Set(),bufferCache=new Map();const getBuffer=async(p,e,type)=>{if(!bufferCache.has(p))bufferCache.set(p,new Map());const cached=bufferCache.get(p);if(!cached.has(type))cached.set(type,await payslipBuffer(p,e,attendance,type));return cached.get(type)}
+ zip.folder('Chuyển khoản từ TK Công ty');zip.folder('Thanh toán tiền mặt');for(const b of ['PHÚ NHUẬN','TÂN PHÚ'])for(const role of ['GIÁO VIÊN','VĂN PHÒNG'])zip.folder('Thanh toán tiền mặt/PAYSLIP_'+b+'_'+role);
  for(const p of payslips){
   const e=employees.find(e=>e.id===p.employeeId);if(!e)continue
-  const period=safeFile(p.displayPeriod||p.period||'KY'),rawBranch=String(e.branch||'').trim(),branch=safeFile(({TP:'TÂN PHÚ',PN:'PHÚ NHUẬN'})[rawBranch.toUpperCase()]||rawBranch.toLocaleUpperCase('vi-VN')||'CHƯA CÓ CHI NHÁNH')
+  if(employeeBranches(e).length>1&&p.branch===undefined)throw Error(e.name+': phiếu cũ chưa phân chi nhánh. Hãy Khởi tạo lại trước khi xuất.');
+  const period=safeFile(p.displayPeriod||p.period||'KY'),rawBranch=String(p.branch??e.branch??'').trim(),branch=safeFile(({TP:'TÂN PHÚ',PN:'PHÚ NHUẬN'})[rawBranch.toUpperCase()]||rawBranch.toLocaleUpperCase('vi-VN')||'CHƯA CÓ CHI NHÁNH')
   const types=[...new Set(p.types||[])],groups=[]
   const hasOffice=types.some(t=>t==='office'||t==='officeBH')
   if(types.some(t=>t==='teacher'||t==='teacherBH'))groups.push(['GIÁO VIÊN',types.filter(t=>['teacher','teacherBH'].includes(t)||(t==='transfer'&&!hasOffice))])
@@ -442,13 +465,14 @@ export async function buildPayslipZip(payslips,employees,attendance,{summaries=f
   if(!groups.length&&types.includes('transfer'))groups.push([/(?:^|;)\s*(GV|TG)\s*(?:;|$)/i.test(e.position||'')?'GIÁO VIÊN':'VĂN PHÒNG',['transfer']])
   const buffers=new Map()
   for(const [group,groupTypes] of groups){
-   const root='PAYSLIP_'+branch+'_'+group+'/'
+   const root='Thanh toán tiền mặt/PAYSLIP_'+branch+'_'+group+'/'
    let parent=root
    if(groupTypes.length>1){const key=root+'|'+e.id;if(!folders.has(key)){let name=safeFile(e.name),i=2;while(usedFolders.has(root+name))name=safeFile(e.name)+'_'+i++;usedFolders.add(root+name);folders.set(key,root+name+'/')}parent=folders.get(key)}
    for(const type of groupTypes){
     const role=({teacher:'GV',teacherBH:'GV',office:'VP',officeBH:'VP'})[type]
-    const name=['PAYSLIP',safeFile(e.name),role,rawBranch?safeFile(e.branch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
-    let path=parent+name,i=2;while(zip.file(path))path=parent+name.replace(/\.xlsx$/,'_'+i+++'.xlsx')
+    const name=['PAYSLIP',safeFile(e.name),role,rawBranch?safeFile(rawBranch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
+    const fileParent=type==='transfer'&&e.salary?.companyTransfer?'Chuyển khoản từ TK Công ty/':parent;
+    let path=fileParent+name,i=2;while(zip.file(path))path=fileParent+name.replace(/\.xlsx$/,'_'+i+++'.xlsx')
     if(!buffers.has(type))buffers.set(type,await getBuffer(p,e,type))
     zip.file(path,buffers.get(type))
    }
@@ -464,11 +488,29 @@ export async function exportMany(payslips,employees,attendance,folderName){await
 export function makePayslip(employee, period, attendance, sourceRows = null) {
   const lineEdits = sourceRows ? structuredClone(sourceRows) : attendance.filter(x => x.period === period && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name) || samePerson(x.employee, employee.name)))
   const hasTeacher = lineEdits.some(x => (['Lớp chung','Phụ đạo','Lớp kèm','Phụ đạo kèm'].includes(x.category) && validTeacherRow(x)) || (/^Placement Test$/i.test(x.category||'') && validPlacementRow(x)))
-  const hasOffice = lineEdits.some(x => x.category === 'Văn phòng') || !!(employee.salary?.office?.full || employee.salary?.office?.part)
+  const hasOffice = lineEdits.some(x => x.category === 'Văn phòng'&&validOfficeRow(x)) || (hasData(employee.salary?.office?.full)||hasData(employee.salary?.office?.part))
   const types = [...(hasTeacher ? ['teacher'] : []), ...(hasOffice ? ['office'] : [])]
-  if (n(employee.salary?.transfer) > 0) types.push('transfer')
-  if (n(employee.salary?.insuranceBase) > 0) { if (hasTeacher) types.push('teacherBH'); if (hasOffice) types.push('officeBH') }
-  return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types:activePayslipTypes({types}), createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class||0,assist:employee.salary?.teacher?.assist||0,tutoring:employee.salary?.teacher?.tutoring||0,assistTutoring:employee.salary?.teacher?.assistTutoring||0,full:employee.salary?.office?.full||0,part:employee.salary?.office?.part||0},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
+  if (hasData(employee.salary?.transfer)) types.push('transfer')
+  if (employee.salary?.companyTransfer || hasData(employee.salary?.insuranceBase) || (employee.salary?.specialInsurance&&hasData(employee.salary.insuranceAmount))) { if (hasTeacher) types.push('teacherBH'); if (hasOffice) types.push('officeBH') }
+  return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types:activePayslipTypes({types}), createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class??'',assist:employee.salary?.teacher?.assist??'',tutoring:employee.salary?.teacher?.tutoring??'',assistTutoring:employee.salary?.teacher?.assistTutoring??'',full:employee.salary?.office?.full??'',part:employee.salary?.office?.part??''},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
+}
+
+export function buildBranchPayslips(employee,period,attendance,options={}){
+ const rows=attendance.filter(r=>(!period||r.period===period)&&(samePerson(r.teacher,employee.name)||samePerson(r.ta,employee.name)||samePerson(r.employee,employee.name)));
+ if(rows.some(r=>!branchCode(r.branch)))return {payslips:[],unassigned:true};
+ const branches=[...new Set([...employeeBranches(employee),...rows.map(r=>branchCode(r.branch))])];
+ if(!branches.length)branches.push('');
+ const list=branches.map(branch=>{
+   const p=makePayslip({...employee,branch},period,attendance,rows.filter(r=>branchCode(r.branch)===branch));
+   return {...p,branch,displayPeriod:options.displayPeriod||period,allPeriods:!period,sourcePeriods:[...new Set(p.lineEdits.map(r=>r.period))].sort(),overrides:{...p.overrides,leaveDays:options.leaveDays||{},leaveDetails:options.leaveDetails||[]}};
+ }).filter(p=>p.types.length);
+ const amount=Math.round(insuranceAmount(employee));
+ const candidates=list.map(p=>({branch:p.branch,gross:payslipGross(p,employee,attendance)}));
+ const chosen=options.insuranceBranch??selectInsuranceBranch(candidates,amount);
+ if(amount>0&&chosen===null&&list.length>0&&candidates.some(c=>c.branch))return {payslips:list,needsChoice:true,candidates,amount};
+ if(chosen!==null&&!list.some(p=>p.branch===chosen))throw Error('Chi nhánh trừ BH không thuộc các phiếu đang tạo.');
+ for(const p of list){p.overrides.insuranceAmount=p.branch===(chosen??list[0]?.branch)?amount:0;p.insuranceBranch=chosen??list[0]?.branch}
+ return {payslips:list};
 }
 
 
