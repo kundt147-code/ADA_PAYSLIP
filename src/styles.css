@@ -338,3 +338,5 @@ body,button,input,select,textarea{font-family:'Segoe UI',Arial,sans-serif!import
 
 .branch-toolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.branch-toolbar label{display:flex;align-items:center;gap:12px}.branch-toolbar select,.insurance-choice select,.leave-body>label select{padding:10px 12px;border:1px solid #d1e4d7;border-radius:10px;background:white;color:#214d3d}.insurance-choice{padding:14px 0;border-bottom:1px solid #e3eee7}.insurance-choice select{min-width:240px}
 .modal-backdrop.insurance-branch-backdrop{z-index:1400!important}
+
+input[placeholder="Dữ liệu trống"]::placeholder,.empty-data{color:#a3ada8!important;font-weight:400!important;opacity:1}

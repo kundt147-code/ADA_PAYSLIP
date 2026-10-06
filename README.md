@@ -1,4 +1,4 @@
-# PAYSLIP web V36 — Round 32
+# PAYSLIP web V37 — Round 33
 
 Bản cập nhật web để kiểm tra các quy tắc mới. Bản ứng dụng Windows chưa thay đổi.
 
@@ -62,3 +62,11 @@ npm run build
 Giữ cấu hình Vercel/Supabase đang dùng: VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY. Không cần SQL migration mới cho đợt này: các trường mới lưu trong JSON lương, chấm công và phiếu hiện có. .env.example chỉ chứa tên biến, không có khóa.
 
 Bản ZIP chứa source, mẫu Excel, kiểm tra và hướng dẫn; không chứa node_modules, dữ liệu trình duyệt hoặc cấu hình bí mật. Chưa triển khai đè lên web công khai.
+
+## Cập nhật BH đặc biệt (Round 33)
+
+- Khi bật cơ chế và nhập 0: MS3 không tính/trừ BH; MS4/MS5 dùng BH bằng 0.
+- Khi bật cơ chế và nhập khác 0: MS3 giữ công thức BH gốc của mẫu; MS4/MS5 dùng số tiền BH đặc biệt đã nhập ở khoản trừ BH bên trái và công thức chuyển khoản sau BH.
+- Lương ở phần bên trái MS4/MS5 vẫn tính theo công thức mẫu; chỉ khoản BH sử dụng số tiền đặc biệt.
+- Không bật cơ chế hoặc để trống số tiền: không kích hoạt ngoại lệ 0.
+- Ô nhập trống và ô thông tin trống hiển thị “Dữ liệu trống” màu xám nhạt. Đây là gợi ý hiển thị, không phải giá trị được lưu. Số 0 vẫn hiển thị 0. Các bộ lọc tìm kiếm giữ lời gợi ý tìm kiếm.

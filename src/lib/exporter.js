@@ -392,10 +392,14 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
       setCommonPeriod(ck,{title:'A5',month:'B6',year:'E6'},'PHIẾU THANH TOÁN TIỀN LƯƠNG_')
       setValue(ck,'E9',employee.name); setValue(ck,'E10',employee.position||''); setValue(ck,'E11',payslip.overrides?.bank??employee.bank??''); setValue(ck,'E12',payslip.overrides?.account??employee.account??''); setMoney(ck,'E14',transfer); setMoney(ck,'E15',food); setMoney(ck,'E16',bonus)
       setMoney(ck,'E21',0)
-      if(payslip.overrides?.insuranceAmount!==undefined||employee.salary?.specialInsurance){
+      const special=employee.salary?.specialInsurance&&hasData(employee.salary?.insuranceAmount)
+      if(special){
+        // Only an explicitly entered zero bypasses MS3 insurance formulas.
+        // A nonzero special amount belongs to MS4/MS5; MS3 keeps its template.
+        if(Number(employee.salary.insuranceAmount)===0){for(const cell of ['E18','E19','E20'])setMoney(ck,cell,0)}
+      }else if(payslip.overrides?.insuranceAmount!==undefined){
         const deduction=money(payslip.overrides?.insuranceAmount??insuranceAmount(employee));
-        if(employee.salary?.specialInsurance){for(const cell of ['E18','E19','E20'])clearCell(ck,cell);ck.getCell('E22').value={formula:'E21+'+deduction}}
-        else {setMoney(ck,'E18',deduction*8/10.5);setMoney(ck,'E19',deduction*1.5/10.5);setMoney(ck,'E20',deduction-money(deduction*8/10.5)-money(deduction*1.5/10.5))}
+        setMoney(ck,'E18',deduction*8/10.5);setMoney(ck,'E19',deduction*1.5/10.5);setMoney(ck,'E20',deduction-money(deduction*8/10.5)-money(deduction*1.5/10.5))
       }
     }
     if (type === 'teacherBH') fillInsuranceSheet(wb.getWorksheet('GV_BH'), employee, payslip, model, display, true)
