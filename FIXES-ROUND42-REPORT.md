@@ -1,0 +1,5 @@
+# Web V47 — Tải dữ liệu ban đầu
+Chấm công và phiếu lương được nhận và mở thao tác độc lập ngay khi từng mục tải xong. Trước đây kết quả thành công vẫn chờ cả hai lượt đọc kết thúc. Giữ kiểm tra revision để phản hồi đến muộn không ghi đè chỉnh sửa mới.
+Đọc theo trang: nhân viên/chấm công 100 dòng, phiếu lương 25 dòng. Khi lỗi kết nối/timeout, thử lại một lần ở cùng vị trí với nửa kích thước trang; không bỏ dòng hoặc công bố dữ liệu một phần. Lỗi quyền không tự thử lại. Timeout đọc 30 giây, ghi 60 giây; thông báo ghi rõ mục, thời gian và phạm vi dòng. Chế độ mở bằng link không lưu hoặc tự gia hạn phiên đăng nhập cũ.
+97 kiểm tra đạt; Vite build thành công. Kiểm tra giao diện mô phỏng xác nhận chấm công thao tác/lưu được trước khi phiếu lương tải xong và phản hồi muộn không mất chỉnh sửa. Lượt đọc thực trên website hiện tại qua Chrome từ máy thử trả HTTP 200 và hoàn tất đồng bộ; chưa xác nhận nguyên nhân mạng/timeout trên thiết bị người dùng. Không khẳng định mọi timeout đã hết.
+Chưa triển khai website hoặc desktop. Không cần SQL mới. Giữ các quy tắc nghiệp vụ hiện có. Báo cáo này bổ sung và cập nhật hành vi tải dữ liệu so với các bản trước.

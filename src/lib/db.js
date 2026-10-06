@@ -1,3 +1,4 @@
+import {readPaged} from './read-pages.js'
 import {fetchWithTimeout} from './network.js'
 import {decodeEmployee,encodeEmployee} from './employee-profile.js'
 import { createClient } from '@supabase/supabase-js'
@@ -5,12 +6,11 @@ import { readEmployeesLocal, writeEmployeesLocal } from './storage'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-export const supabase = url && key ? createClient(url,key,{global:{fetch:fetchWithTimeout}}) : null
+export const supabase = url && key ? createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch:fetchWithTimeout}}) : null
 
 export async function listEmployees() {
   if (!supabase) return readEmployeesLocal().map(decodeEmployee)
-  const rows=[]
-  for(let from=0;;from+=250){const {data,error}=await supabase.from('employees').select('*').order('name').order('id').range(from,from+249);if(error)throw error;rows.push(...(data||[]));if((data||[]).length<250)break}
+  const rows=await readPaged((from,to)=>supabase.from('employees').select('*').order('name').order('id').range(from,to),{pageSize:100,label:'Nhân viên'})
   writeEmployeesLocal(rows);return rows.map(decodeEmployee)
 }
 export async function upsertEmployee(emp) {
