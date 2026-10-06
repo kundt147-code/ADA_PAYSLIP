@@ -332,7 +332,7 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
     }}))
   }
   const model = buildModel(employee, payslip, attendance)
-  const types = onlyType ? [onlyType] : (payslip.types || [])
+  const types = onlyType ? [onlyType] : activePayslipTypes(payslip)
   const display = periodParts(payslip.displayPeriod || (!payslip.allPeriods?payslip.period:'') || '')
   const rates = payslip.overrides?.rates || {}
   const transfer = n(employee.salary?.transfer)
@@ -428,13 +428,16 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
 export async function payslipBuffer(payslip, employee, attendance, type=null, {signal}={}) { signal?.throwIfAborted(); const wb=await workbookFor(payslip,employee,attendance,type,signal); signal?.throwIfAborted(); const out=await writeExcelBuffer(wb); signal?.throwIfAborted(); return out }
 function safeFile(s){return String(s||'').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').trim().replace(/[. ]+$/g,'')||'UNKNOWN'}
 const typeCode={teacher:'MS1',office:'MS2',transfer:'MS3',teacherBH:'MS4',officeBH:'MS5'}
+export function activePayslipTypes(payslip){const types=[...new Set(payslip.types||[])];return types.filter(t=>!(t==='teacher'&&types.includes('teacherBH'))&&!(t==='office'&&types.includes('officeBH')))}
 export async function buildPayslipZip(payslips,employees,attendance,{summaries=false}={}){
+ payslips=payslips.map(p=>({...p,types:activePayslipTypes(p)}))
  const zip=new JSZip(),folders=new Map(),usedFolders=new Set(),bufferCache=new Map();const getBuffer=async(p,e,type)=>{if(!bufferCache.has(p))bufferCache.set(p,new Map());const cached=bufferCache.get(p);if(!cached.has(type))cached.set(type,await payslipBuffer(p,e,attendance,type));return cached.get(type)}
  for(const p of payslips){
   const e=employees.find(e=>e.id===p.employeeId);if(!e)continue
   const period=safeFile(p.displayPeriod||p.period||'KY'),rawBranch=String(e.branch||'').trim(),branch=safeFile(({TP:'TÂN PHÚ',PN:'PHÚ NHUẬN'})[rawBranch.toUpperCase()]||rawBranch.toLocaleUpperCase('vi-VN')||'CHƯA CÓ CHI NHÁNH')
   const types=[...new Set(p.types||[])],groups=[]
-  if(types.some(t=>t==='teacher'||t==='teacherBH'))groups.push(['GIÁO VIÊN',types.filter(t=>['teacher','teacherBH','transfer'].includes(t))])
+  const hasOffice=types.some(t=>t==='office'||t==='officeBH')
+  if(types.some(t=>t==='teacher'||t==='teacherBH'))groups.push(['GIÁO VIÊN',types.filter(t=>['teacher','teacherBH'].includes(t)||(t==='transfer'&&!hasOffice))])
   if(types.some(t=>t==='office'||t==='officeBH'))groups.push(['VĂN PHÒNG',types.filter(t=>['office','officeBH','transfer'].includes(t))])
   if(!groups.length&&types.includes('transfer'))groups.push([/(?:^|;)\s*(GV|TG)\s*(?:;|$)/i.test(e.position||'')?'GIÁO VIÊN':'VĂN PHÒNG',['transfer']])
   const buffers=new Map()
@@ -465,7 +468,7 @@ export function makePayslip(employee, period, attendance, sourceRows = null) {
   const types = [...(hasTeacher ? ['teacher'] : []), ...(hasOffice ? ['office'] : [])]
   if (n(employee.salary?.transfer) > 0) types.push('transfer')
   if (n(employee.salary?.insuranceBase) > 0) { if (hasTeacher) types.push('teacherBH'); if (hasOffice) types.push('officeBH') }
-  return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types, createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class||0,assist:employee.salary?.teacher?.assist||0,tutoring:employee.salary?.teacher?.tutoring||0,assistTutoring:employee.salary?.teacher?.assistTutoring||0,full:employee.salary?.office?.full||0,part:employee.salary?.office?.part||0},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
+  return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types:activePayslipTypes({types}), createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class||0,assist:employee.salary?.teacher?.assist||0,tutoring:employee.salary?.teacher?.tutoring||0,assistTutoring:employee.salary?.teacher?.assistTutoring||0,full:employee.salary?.office?.full||0,part:employee.salary?.office?.part||0},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
 }
 
 
