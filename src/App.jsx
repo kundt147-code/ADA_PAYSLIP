@@ -27,7 +27,7 @@ const dataMoney=n=>hasData(n)?money(n):emptyData
 const money=n=>Number(n||0).toLocaleString('vi-VN')
 function periodLabel(p){if(!p)return '';if(!/^\d{4}-\d{2}$/.test(p))return p;const [y,m]=p.split('-');return `Tháng ${Number(m)}/${y}`}
 function periodParts(p){const [y,m]=(p||'').split('-');return {year:y||String(new Date().getFullYear()),month:m||String(new Date().getMonth()+1).padStart(2,'0')}}
-function normalizePersonName(value){return String(value??'').trim().replace(/^(mr\.?|mrs\.?|ms\.?|miss\.?|dr\.?)\s+/i,'').replace(/\s+/g,' ').toLocaleLowerCase('vi-VN')}
+function normalizePersonName(value){return String(value??'').normalize('NFC').trim().replace(/^(mr\.?|mrs\.?|ms\.?|miss\.?|dr\.?)\s+/i,'').replace(/\s+/g,' ').toLocaleLowerCase('vi-VN')}
 function searchName(value){return normalizePersonName(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d')}
 function samePerson(a,b){return normalizePersonName(a)===normalizePersonName(b)}
 function App(){

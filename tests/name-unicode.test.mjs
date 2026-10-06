@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {buildBranchPayslips} from '../src/lib/exporter.js';
+const employee={id:'unicode',name:'Vũ Thị Thúy An',branch:'PN',position:'GV',salary:{teacher:{class:100000},office:{full:'',part:''},transfer:2115000,insuranceBase:''}};
+const row={id:'row',period:'2026-09',date:'2026-09-30',branch:'PN',category:'Lớp chung',className:'IELTS - 56 ONL',hours:1.5,teacher:employee.name.normalize('NFD')};
+test('visually identical Vietnamese names match attendance and preserve CK plus teacher salary',()=>{const p=buildBranchPayslips(employee,'2026-09',[row]).payslips[0];assert.deepEqual(p.types,['transfer','teacher']);assert.equal(p.lineEdits.length,1)});
+test('canonical name matching keeps attendance in its own branch and period',()=>{const ps=buildBranchPayslips(employee,'2026-09',[{...row,branch:'TP'},{...row,id:'old',period:'2026-08'}]).payslips;assert.equal(ps.find(p=>p.branch==='PN').lineEdits.length,0);assert.deepEqual(ps.find(p=>p.branch==='TP').types,['transfer','teacher']);assert.equal(ps.find(p=>p.branch==='TP').lineEdits.length,1)});

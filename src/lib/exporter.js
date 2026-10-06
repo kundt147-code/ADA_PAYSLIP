@@ -35,7 +35,7 @@ function displayDate(dateStr) {
 }
 function hasPct(className) { return /%/.test(String(className || '')) }
 function normalizePersonName(value) {
-  return String(value ?? '')
+  return String(value ?? '').normalize('NFC')
     .trim()
     .replace(/^(mr\.?|mrs\.?|ms\.?|miss\.?|dr\.?)\s+/i, '')
     .replace(/\s+/g, ' ')
