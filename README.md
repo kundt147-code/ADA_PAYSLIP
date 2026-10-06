@@ -1,4 +1,4 @@
-# PAYSLIP web V37 — Round 33
+# PAYSLIP web V38 — Round 34
 
 Bản cập nhật web để kiểm tra các quy tắc mới. Bản ứng dụng Windows chưa thay đổi.
 
@@ -70,3 +70,11 @@ Bản ZIP chứa source, mẫu Excel, kiểm tra và hướng dẫn; không ch�
 - Lương ở phần bên trái MS4/MS5 vẫn tính theo công thức mẫu; chỉ khoản BH sử dụng số tiền đặc biệt.
 - Không bật cơ chế hoặc để trống số tiền: không kích hoạt ngoại lệ 0.
 - Ô nhập trống và ô thông tin trống hiển thị “Dữ liệu trống” màu xám nhạt. Đây là gợi ý hiển thị, không phải giá trị được lưu. Số 0 vẫn hiển thị 0. Các bộ lọc tìm kiếm giữ lời gợi ý tìm kiếm.
+
+## Sửa ô chọn bảng Nhân viên (Round 34)
+
+Ô chọn từng dòng và chọn tất cả không còn bị khóa theo trạng thái tải/lưu dữ liệu. Đây chỉ là lựa chọn trong giao diện. Nút xóa đã chọn vẫn khóa lúc bận xử lý. Màu chữ Dữ liệu trống và các quy tắc bảo hiểm của Round 33 giữ nguyên.
+
+## Sửa ô chọn bảng Nhân viên (Round 34)
+
+Ô chọn từng dòng và chọn tất cả không còn bị khóa theo trạng thái tải/lưu dữ liệu. Đây chỉ là lựa chọn trong giao diện. Nút xóa đã chọn vẫn khóa lúc bận xử lý. Màu chữ Dữ liệu trống và các quy tắc bảo hiểm của Round 33 giữ nguyên.
