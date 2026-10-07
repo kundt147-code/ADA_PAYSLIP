@@ -47,7 +47,7 @@ function effectiveRate(rate, className, employee, mode='') {
   if (mode === 'teacher' && employee?.salary?.special4 && hasPct(name)) return 170000
   if (employee?.salary?.special3 && /IELTS\s*-\s*56%\s*ONL/i.test(name)) return n(rate)
   if (mode === 'tutoring' && employee?.salary?.special2 && /ONL/i.test(name)) return n(rate) * 0.8
-  if (employee?.salary?.special1 && /%/.test(name)) return n(rate) * 0.8
+  if (mode === 'teacher' && employee?.salary?.special1 && /%/.test(name)) return n(rate) * 0.8
   return n(rate)
 }
 
@@ -414,13 +414,15 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
   const leaveDetails=(payslip.overrides?.leaveDetails||[]).filter(r=>[r.detail,r.time,r.days,r.note].some(hasData))
   if(leaveDetails.length)for(const ws of wb.worksheets){
     if(ws.name==='CK')continue
-    const left=ws.name.startsWith('GV')?12:9,right=left+7;let occupied=8;ws.eachRow(row=>row.eachCell(cell=>{if(cell.col>=left&&cell.value!==null&&cell.value!==undefined)occupied=Math.max(occupied,row.number)}));for(const merge of Object.values(ws._merges||{})){const m=merge.model||merge;if(m.right>=left)occupied=Math.max(occupied,m.bottom)}const start=occupied+3,groups=[[left,left+1],[left+2,left+3],[left+4,left+4],[left+5,right]]
+    const left=ws.name.startsWith('GV')?12:9,right=left+5;let occupied=8;ws.eachRow(row=>row.eachCell(cell=>{if(cell.col>=left&&cell.value!==null&&cell.value!==undefined)occupied=Math.max(occupied,row.number)}));for(const merge of Object.values(ws._merges||{})){const m=merge.model||merge;if(m.right>=left)occupied=Math.max(occupied,m.bottom)}const start=occupied+3,groups=[[left,left+1],[left+2,left+3],[left+4,left+4],[left+5,right]]
     ws.mergeCells(start,left,start,right);ws.getCell(start,left).value='CHI TIẾT NGÀY NGHỈ'
     const content=[['Chi tiết','Thời gian','Số ngày','Ghi chú'],...leaveDetails.map(r=>[r.detail||'',r.time||'',hasData(r.days)?n(r.days):'',r.note||''])]
     for(let i=0;i<content.length;i++){const row=start+1+i;groups.forEach(([left,right],j)=>{if(right>left)ws.mergeCells(row,left,row,right);const c=ws.getCell(row,left);c.value=content[i][j];if(j===2&&i)c.numFmt='0.##'})}
-    for(let row=start;row<=start+content.length;row++){const header=row<=start+1;ws.getRow(row).height=header?28:Math.max(32,24*Math.ceil(Math.max(...content[row-start-1].map(v=>String(v).length))/35));for(let col=left;col<=right;col++){const c=ws.getCell(row,col);c.font={name:'Times New Roman',size:12,bold:header,color:{argb:'FF234D3E'}};c.alignment={vertical:'middle',wrapText:true,horizontal:header?'center':'left'};c.border={top:{style:'thin',color:{argb:'FFB8CEC2'}},bottom:{style:'thin',color:{argb:'FFB8CEC2'}},left:{style:'thin',color:{argb:'FFB8CEC2'}},right:{style:'thin',color:{argb:'FFB8CEC2'}}};if(header)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:row===start?'FFDDECE3':'FFF0F6F2'}}}}
+    for(let row=start;row<=start+content.length;row++){const header=row<=start+1;ws.getRow(row).height=header?20:Math.max(20,15*Math.ceil(Math.max(...content[row-start-1].map(v=>String(v).length))/35));for(let col=left;col<=right;col++){const c=ws.getCell(row,col);c.font={name:'Times New Roman',size:row===start?11:10,bold:header,color:{argb:'FF9C0006'}};c.alignment={vertical:'middle',wrapText:true,horizontal:header?'center':'left'};c.border={top:{style:'thin',color:{argb:'FFE5AAAA'}},bottom:{style:'thin',color:{argb:'FFE5AAAA'}},left:{style:'thin',color:{argb:'FFE5AAAA'}},right:{style:'thin',color:{argb:'FFE5AAAA'}}};if(header)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:row===start?'FFFF9999':'FFFFE2E2'}}}}
     const last=Math.max(ws.rowCount,start+content.length);ws.pageSetup.printArea='A1:'+ws.getColumn(Math.max(8,ws.columnCount)).letter+last
   }
+  // Clear hidden rows inherited from the source template after all row resizing.
+  for(const ws of wb.worksheets)ws.eachRow({includeEmpty:true},row=>{row.hidden=false})
   return wb
 }
 
@@ -476,7 +478,7 @@ export async function buildPayslipZip(payslips,employees,attendance,{summaries=f
   for(const [group,groupTypes] of groups){
    const root='THANH TOÁN TIỀN MẶT/PAYSLIP_'+branch+'_'+group+'/'
    let parent=root
-   if(groupTypes.length>1){const key=root+'|'+e.id;if(!folders.has(key)){let name=safeFile(e.name),i=2;while(usedFolders.has(root+name))name=safeFile(e.name)+'_'+i++;usedFolders.add(root+name);folders.set(key,root+name+'/')}parent=folders.get(key)}
+   if(groupTypes.filter(type=>!(type==='transfer'&&e.salary?.companyTransfer)).length>1){const key=root+'|'+e.id;if(!folders.has(key)){let name=safeFile(e.name),i=2;while(usedFolders.has(root+name))name=safeFile(e.name)+'_'+i++;usedFolders.add(root+name);folders.set(key,root+name+'/')}parent=folders.get(key)}
    for(const type of groupTypes){
     const role=({teacher:'GV',teacherBH:'GV',office:'VP',officeBH:'VP'})[type]
     const name=['PAYSLIP',safeFile(e.name),role,rawBranch?safeFile(rawBranch):null,typeCode[type],period].filter(Boolean).join('_')+'.xlsx'
