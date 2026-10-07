@@ -455,7 +455,7 @@ function fillInsuranceSheet(ws, employee, payslip, model, display, teacher){
   }
 }
 
-export async function payslipBuffer(payslip, employee, attendance, type=null, {signal}={}) { signal?.throwIfAborted(); const wb=await workbookFor(payslip,employee,attendance,type,signal); signal?.throwIfAborted(); const out=await writeExcelBuffer(wb); signal?.throwIfAborted(); return out }
+export async function payslipBuffer(payslip, employee, attendance, type=null, {signal}={}) { signal?.throwIfAborted(); const wb=await workbookFor(payslip,employee,attendance,type,signal); signal?.throwIfAborted(); const out=await writeExcelBuffer(wb,{visibleRows:true}); signal?.throwIfAborted(); return out }
 function safeFile(s){return String(s||'').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').trim().replace(/[. ]+$/g,'')||'UNKNOWN'}
 const typeCode={teacher:'MS1',office:'MS2',transfer:'MS3',teacherBH:'MS4',officeBH:'MS5'}
 export const activePayslipTypes=activeTypes;

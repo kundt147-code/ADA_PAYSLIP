@@ -3,10 +3,16 @@ import JSZip from 'jszip'
 // ExcelJS 4.4 writes legacyDrawing after tableParts/extLst. SpreadsheetML
 // requires legacyDrawing before picture/oleObjects/controls/tableParts/extLst.
 // Keep the notes, tables and relationships; correct only their element order.
-export async function writeExcelBuffer(workbook) {
+export async function writeExcelBuffer(workbook,{visibleRows=false}={}) {
   const zip=await JSZip.loadAsync(await workbook.xlsx.writeBuffer())
   for(const name of Object.keys(zip.files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n))) {
     let xml=await zip.file(name).async('string')
+    if(visibleRows){
+      xml=xml.replace(/<sheetFormatPr\b[^>]*>/g,tag=>tag.replace(/\s+zeroHeight="[^"]*"/g,''))
+      const defaultHeight=Number(xml.match(/<sheetFormatPr\b[^>]*defaultRowHeight="([^"]+)"/)?.[1])||15
+      xml=xml.replace(/<row\b[^>]*>/g,tag=>tag.replace(/\s+(?:hidden|collapsed)="[^"]*"/g,'').replace(/\bht="([^"]+)"/g,(attr,height)=>Number(height)>0?attr:'ht="'+defaultHeight+'"'))
+      zip.file(name,xml)
+    }
     const drawings=xml.match(/<legacyDrawing\b[^>]*\/>/g)
     if(!drawings)continue
     xml=xml.replace(/<legacyDrawing\b[^>]*\/>/g,'')
