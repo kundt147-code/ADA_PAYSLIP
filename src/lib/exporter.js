@@ -222,6 +222,17 @@ function clearDetailRows(ws, firstRow, lastRow) {
   }
 }
 
+function formatDetailRow(ws,row,{placement=false,total=false}={}) {
+  for(let col=1;col<=8;col++){
+    const cell=ws.getCell(row,col)
+    cell.style={...cell.style}
+    const horizontal=col>=6?'right':col===3||(placement&&col===4)?'left':'center'
+    cell.font={...cell.font,name:'Times New Roman',size:10,bold:total,italic:false}
+    cell.alignment={...cell.alignment,horizontal,vertical:'middle',indent:0,readingOrder:'ltr',shrinkToFit:false}
+    if(col>=7)cell.numFmt='#,##0;(#,##0);"-"'
+  }
+}
+
 function writeTeacherRows(ws, firstRow, rows, totalRow) {
   const end = totalRow - 1
   clearDetailRows(ws, firstRow, end)
@@ -236,7 +247,9 @@ function writeTeacherRows(ws, firstRow, rows, totalRow) {
     setValue(ws, `F${r}`, n(x.hours))
     setMoney(ws, `G${r}`, x.rate)
     setMoney(ws, `H${r}`, x.amount)
+    formatDetailRow(ws,r)
   })
+  formatDetailRow(ws,totalRow,{total:true})
   return {
     hours: rows.reduce((s, x) => s + n(x.hours), 0),
     amount: rows.reduce((s, x) => s + n(x.amount), 0),
@@ -375,8 +388,8 @@ async function workbookFor(payslip, employee, attendance, onlyType = null, signa
       const tf=fitDetailSection(gv,44+shift,2,model.tutoring.length,46+shift);const tt=writeTeacherRows(gv,44+shift,model.tutoring,tf.totalRow);setValue(gv,`A${tf.totalRow}`,'TỔNG (3)');setValue(gv,`F${tf.totalRow}`,tt.hours);setMoney(gv,`H${tf.totalRow}`,tt.amount);shift+=tf.delta
       const atf=fitDetailSection(gv,49+shift,2,model.assistTutoring.length,51+shift);const att=writeTeacherRows(gv,49+shift,model.assistTutoring,atf.totalRow);setValue(gv,`A${atf.totalRow}`,'TỔNG (3)');setValue(gv,`F${atf.totalRow}`,att.hours);setMoney(gv,`H${atf.totalRow}`,att.amount);shift+=atf.delta
       const pf=fitDetailSection(gv,54+shift,1,model.placement.length,55+shift);clearDetailRows(gv,pf.firstRow,pf.totalRow-1)
-      model.placement.forEach((x,i)=>{const r=pf.firstRow+i;setValue(gv,`A${r}`,displayDate(x.date));setValue(gv,`B${r}`,x.day||dayName(x.date));setValue(gv,`C${r}`,x.student);setValue(gv,`D${r}`,x.testName||'');setMoney(gv,`H${r}`,x.amount??20000)})
-      setMoney(gv,`H${pf.totalRow}`,model.placement.reduce((sum,x)=>sum+n(x.amount??20000),0));shift+=pf.delta
+      model.placement.forEach((x,i)=>{const r=pf.firstRow+i;setValue(gv,`A${r}`,displayDate(x.date));setValue(gv,`B${r}`,x.day||dayName(x.date));setValue(gv,`C${r}`,x.student);setValue(gv,`D${r}`,x.testName||'');setMoney(gv,`H${r}`,x.amount??20000);formatDetailRow(gv,r,{placement:true})})
+      formatDetailRow(gv,pf.totalRow,{placement:true,total:true});setMoney(gv,`H${pf.totalRow}`,model.placement.reduce((sum,x)=>sum+n(x.amount??20000),0));shift+=pf.delta
       const officeStart=56+shift;setMoney(gv,`F${officeStart+1}`,model.officeFull);setMoney(gv,`F${officeStart+2}`,model.officePart);setValue(gv,`F${officeStart+3}`,model.officeHours||0);setMoney(gv,`F${officeStart+4}`,model.officeTotal-model.officeFull/(display.year&&display.month?new Date(Number(display.year),Number(display.month),0).getDate():30)*n(payslip.overrides?.leaveDays?.unpaid))
       const ins=money(payslip.overrides?.insuranceAmount??insuranceAmount(employee));clearCell(gv,`D${62+shift}`);setMoney(gv,`D${63+shift}`,ins)
       gv.getCell(`H${64+shift}`).value={formula:`F${60+shift}+H${pf.totalRow}+H${atf.totalRow}+H${cf.totalRow}+H${af.totalRow}+H${tf.totalRow}-D${63+shift}`}
