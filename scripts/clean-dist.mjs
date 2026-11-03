@@ -1,0 +1,1 @@
+import fs from 'node:fs/promises';import path from 'node:path';const root=path.resolve('dist');const fixture=path.join(root,'sample-attendance-real.xlsx');if(!fixture.startsWith(root+path.sep))throw Error('Invalid output');await fs.rm(fixture,{force:true});

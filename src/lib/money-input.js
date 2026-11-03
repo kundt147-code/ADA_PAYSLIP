@@ -1,0 +1,2 @@
+export function formatMoneyInput(value){if(value===''||value==null)return '';const number=Number(value);return Number.isFinite(number)?number.toLocaleString('vi-VN',{maximumFractionDigits:6}):''}
+export function parseMoneyInput(value){const text=String(value??'').trim().replace(/\s/g,'').replace(/\./g,'').replace(/,/g,'.');if(text==='')return '';if(!/^-?\d*(?:\.\d*)?$/.test(text)||text==='-'||text==='.')return null;const number=Number(text);return Number.isFinite(number)?String(number):null}

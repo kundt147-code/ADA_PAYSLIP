@@ -1,3 +1,6 @@
+import {normalizePersonName} from './person-name.js'
+import {downloadFile} from './download.js'
+import {arithmetic} from './arithmetic.js'
 import {hasData,activeTypes,insuranceAmount,branchCode,employeeBranches,selectInsuranceBranch} from './payroll-policy.js'
 import {addPayrollSummaries} from './payroll-summaries.js'
 import { writeExcelBuffer } from './xlsx-output.js'
@@ -34,19 +37,16 @@ function displayDate(dateStr) {
   return y && m && d ? `${Number(d)}/${Number(m)}/${y}` : String(dateStr)
 }
 function hasPct(className) { return /%/.test(String(className || '')) }
-function normalizePersonName(value) {
-  return String(value ?? '').normalize('NFC')
-    .trim()
-    .replace(/^(mr\.?|mrs\.?|ms\.?|miss\.?|dr\.?)\s+/i, '')
-    .replace(/\s+/g, ' ')
-    .toLocaleLowerCase('vi-VN')
-}
 function samePerson(a, b) { return normalizePersonName(a) === normalizePersonName(b) }
-function effectiveRate(rate, className, employee, mode='') {
+function effectiveRate(rate, className, employee, mode='', onlineRate, specialRate) {
   const name = String(className || '')
+  const specialName=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d').toLowerCase()
+  if (/dac\s+biet/.test(specialName) && hasData(specialRate)) return n(specialRate)
+  const explicitOnline = /ONL/i.test(name) && hasData(onlineRate)
+  if (explicitOnline) rate = onlineRate
   if (mode === 'teacher' && employee?.salary?.special4 && hasPct(name)) return 170000
   if (employee?.salary?.special3 && /IELTS\s*-\s*56%\s*ONL/i.test(name)) return n(rate)
-  if (mode === 'tutoring' && employee?.salary?.special2 && /ONL/i.test(name)) return n(rate) * 0.8
+  if (mode === 'tutoring' && employee?.salary?.special2 && /ONL/i.test(name) && !explicitOnline) return n(rate) * 0.8
   if (mode === 'teacher' && employee?.salary?.special1 && /%/.test(name)) return n(rate) * 0.8
   return n(rate)
 }
@@ -84,7 +84,7 @@ function buildModel(employee, payslip, attendance) {
   const officePart = n(rates.part ?? employee.salary?.office?.part)
 
   const common = rows.filter(x => x.category === 'Lớp chung' && samePerson(x.teacher, employee.name)).map(x => ({
-    ...x, rate: effectiveRate(classRate, x.className, employee, 'teacher'), amount: n(x.hours) * effectiveRate(classRate, x.className, employee, 'teacher')
+    ...x, rate: effectiveRate(classRate, x.className, employee, 'teacher', rates.classOnline ?? employee.salary?.teacher?.classOnline, rates.classSpecial ?? employee.salary?.teacher?.classSpecial), amount: n(x.hours) * effectiveRate(classRate, x.className, employee, 'teacher', rates.classOnline ?? employee.salary?.teacher?.classOnline, rates.classSpecial ?? employee.salary?.teacher?.classSpecial)
   }))
 
   // A teacher acting as TA on a common class is recorded as one line in Phụ đạo.
@@ -92,13 +92,13 @@ function buildModel(employee, payslip, attendance) {
   const assist = rows.filter(x =>
     (x.category === 'Phụ đạo' && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name))) ||
     (x.category === 'Lớp chung' && samePerson(x.ta, employee.name))
-  ).map(x => ({ ...x, rate: effectiveRate(assistRate, x.className, employee, 'assist'), amount: n(x.hours) * effectiveRate(assistRate, x.className, employee, 'assist') }))
+  ).map(x => ({ ...x, rate: effectiveRate(assistRate, x.className, employee, 'assist', rates.assistOnline ?? employee.salary?.teacher?.assistOnline, (x.category === 'Lớp chung' || (samePerson(x.ta, employee.name) && !samePerson(x.teacher, employee.name))) ? (rates.taSpecial ?? employee.salary?.teacher?.taSpecial) : (rates.assistSpecial ?? employee.salary?.teacher?.assistSpecial)), amount: n(x.hours) * effectiveRate(assistRate, x.className, employee, 'assist', rates.assistOnline ?? employee.salary?.teacher?.assistOnline, (x.category === 'Lớp chung' || (samePerson(x.ta, employee.name) && !samePerson(x.teacher, employee.name))) ? (rates.taSpecial ?? employee.salary?.teacher?.taSpecial) : (rates.assistSpecial ?? employee.salary?.teacher?.assistSpecial)) }))
 
   const tutoring = rows.filter(x => x.category === 'Lớp kèm' && samePerson(x.teacher, employee.name))
-    .map(x => ({ ...x, rate: effectiveRate(tutoringRate, x.className, employee, 'tutoring'), amount: n(x.hours) * effectiveRate(tutoringRate, x.className, employee, 'tutoring') }))
+    .map(x => ({ ...x, rate: effectiveRate(tutoringRate, x.className, employee, 'tutoring', rates.tutoringOnline ?? employee.salary?.teacher?.tutoringOnline, rates.tutoringSpecial ?? employee.salary?.teacher?.tutoringSpecial), amount: n(x.hours) * effectiveRate(tutoringRate, x.className, employee, 'tutoring', rates.tutoringOnline ?? employee.salary?.teacher?.tutoringOnline, rates.tutoringSpecial ?? employee.salary?.teacher?.tutoringSpecial) }))
 
   const assistTutoring = rows.filter(x => x.category === 'Phụ đạo kèm' && (samePerson(x.teacher, employee.name) || samePerson(x.ta, employee.name)))
-    .map(x => ({ ...x, rate: effectiveRate(assistTutoringRate, x.className, employee, 'assist'), amount: n(x.hours) * effectiveRate(assistTutoringRate, x.className, employee, 'assist') }))
+    .map(x => ({ ...x, rate: effectiveRate(assistTutoringRate, x.className, employee, 'assist', rates.assistTutoringOnline ?? employee.salary?.teacher?.assistTutoringOnline, (samePerson(x.ta, employee.name) && !samePerson(x.teacher, employee.name)) ? (rates.taSpecial ?? employee.salary?.teacher?.taSpecial) : (rates.assistTutoringSpecial ?? employee.salary?.teacher?.assistTutoringSpecial)), amount: n(x.hours) * effectiveRate(assistTutoringRate, x.className, employee, 'assist', rates.assistTutoringOnline ?? employee.salary?.teacher?.assistTutoringOnline, (samePerson(x.ta, employee.name) && !samePerson(x.teacher, employee.name)) ? (rates.taSpecial ?? employee.salary?.teacher?.taSpecial) : (rates.assistTutoringSpecial ?? employee.salary?.teacher?.assistTutoringSpecial)) }))
 
   const officeRows = rows.filter(x => x.category === 'Văn phòng' && samePerson(x.employee, employee.name))
   const officeHours = overrides.officeHours !== undefined
@@ -307,11 +307,11 @@ function formulaCellResult(ws, address, stack = new Set()) {
   f = f.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)')
   f = f.replace(/\b([A-Z]{1,3}\d+)\b/g, (_, addr) => ' '+String(refValue(addr))+' ')
   // Reduce innermost MIN/MAX calls before evaluating the arithmetic expression.
-  const numericExpression=expression=>{if(!/^[\d\s.+*/()%\-]+$/.test(expression))throw new Error('Unsupported numeric expression');const value=Function(`"use strict"; return (${expression})`)();if(!Number.isFinite(value))throw new Error('Invalid numeric result');return value}
+  const numericExpression=expression=>{if(!/^[\d\s.+*/()%\-]+$/.test(expression))throw new Error('Unsupported numeric expression');const value=arithmetic(expression);if(!Number.isFinite(value))throw new Error('Invalid numeric result');return value}
   for(let i=0;i<32&&/\b(?:MIN|MAX)\(/i.test(f);i++){const previous=f;f=f.replace(/\b(MIN|MAX)\(([^()]*)\)/gi,(_,name,args)=>String((name.toUpperCase()==='MIN'?Math.min:Math.max)(...args.split(',').map(numericExpression))));if(previous===f)break}
   try {
     if (!/^[\d\s.+*/()%\-]+$/.test(f)) throw new Error('Unsupported formula: '+f)
-    const result = Function(`"use strict"; return (${f})`)()
+    const result = arithmetic(f)
     return Number.isFinite(Number(result)) ? Number(result) : 0
   } catch (error) { throw new Error(`Công thức ${ws.name}!${address}: ${error.message}`) }
 }
@@ -505,7 +505,7 @@ export async function buildPayslipZip(payslips,employees,attendance,{summaries=f
  if(summaries&&payslips.length)await addPayrollSummaries(zip,payslips,employees,attendance,getBuffer)
  return zip
 }
-async function downloadPayslipZip(zip,name){const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+async function downloadPayslipZip(zip,name){const blob=await zip.generateAsync({type:'blob'});await downloadFile(blob,name+'.zip')}
 export async function exportPayslip(payslip,employee,attendance){const zip=await buildPayslipZip([payslip],[employee],attendance,{summaries:true});await downloadPayslipZip(zip,'PAYSLIP_'+safeFile(employee.branch||'Chưa có chi nhánh')+'_'+safeFile(payslip.displayPeriod||payslip.period||'KY'))}
 export async function exportMany(payslips,employees,attendance,folderName){await downloadPayslipZip(await buildPayslipZip(payslips,employees,attendance,{summaries:true}),safeFile(folderName||'PAYSLIP'))}
 
@@ -516,7 +516,7 @@ export function makePayslip(employee, period, attendance, sourceRows = null) {
   const types = [...(hasTeacher ? ['teacher'] : []), ...(hasOffice ? ['office'] : [])]
   if (hasData(employee.salary?.transfer)) types.push('transfer')
   if (employee.salary?.companyTransfer || hasData(employee.salary?.insuranceBase) || (employee.salary?.specialInsurance&&hasData(employee.salary.insuranceAmount))) { if (hasTeacher) types.push('teacherBH'); if (hasOffice) types.push('officeBH') }
-  return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types:activePayslipTypes({types}), createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{class:employee.salary?.teacher?.class??'',assist:employee.salary?.teacher?.assist??'',tutoring:employee.salary?.teacher?.tutoring??'',assistTutoring:employee.salary?.teacher?.assistTutoring??'',full:employee.salary?.office?.full??'',part:employee.salary?.office?.part??''},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
+  return { id:crypto.randomUUID(), employeeId:employee.id, employeeName:employee.name, period, types:activePayslipTypes({types}), createdAt:new Date().toISOString(), lineEdits:structuredClone(lineEdits), overrides:{bank:employee.bank||'',account:employee.account||'',rates:{classSpecial:employee.salary?.teacher?.classSpecial??'',assistSpecial:employee.salary?.teacher?.assistSpecial??'',tutoringSpecial:employee.salary?.teacher?.tutoringSpecial??'',assistTutoringSpecial:employee.salary?.teacher?.assistTutoringSpecial??'',taSpecial:employee.salary?.teacher?.taSpecial??'',classOnline:employee.salary?.teacher?.classOnline??'',assistOnline:employee.salary?.teacher?.assistOnline??'',tutoringOnline:employee.salary?.teacher?.tutoringOnline??'',assistTutoringOnline:employee.salary?.teacher?.assistTutoringOnline??'',class:employee.salary?.teacher?.class??'',assist:employee.salary?.teacher?.assist??'',tutoring:employee.salary?.teacher?.tutoring??'',assistTutoring:employee.salary?.teacher?.assistTutoring??'',full:employee.salary?.office?.full??'',part:employee.salary?.office?.part??''},officeHours:lineEdits.filter(x=>x.category==='Văn phòng').reduce((s,x)=>s+n(x.hours),0)}}
 }
 
 export function buildBranchPayslips(employee,period,attendance,options={}){

@@ -1,5 +1,6 @@
+import {normalizePersonName} from './person-name.js'
 export function attendanceRoleHours(rows,name=''){
- const normalize=value=>String(value||'').normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('vi-VN')
+ const normalize=normalizePersonName
  const selected=normalize(name);let main=0,assist=0
  for(const row of rows){const teacher=normalize(row.teacher),ta=normalize(row.ta),hours=Number(row.hours)||0
   const isMain=!!teacher&&(!selected||teacher===selected)
